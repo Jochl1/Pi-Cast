@@ -5,16 +5,18 @@
  */
 export default function createControls({ playback, cast, mpv }) {
   const castPlayer = () => (playback.owner === 'cast' ? cast.player : null);
+  // With nothing playing, mpv shows the home backdrop; leave it alone.
+  const idle = () => (playback.source ? null : Promise.resolve());
 
   const controls = {
-    pause: () => castPlayer()?.pause() ?? mpv.pause(),
-    resume: () => castPlayer()?.resume() ?? mpv.resume(),
+    pause: () => idle() ?? castPlayer()?.pause() ?? mpv.pause(),
+    resume: () => idle() ?? castPlayer()?.resume() ?? mpv.resume(),
     toggle: () => (mpv.props.pause ? controls.resume() : controls.pause()),
     stop: () => castPlayer()?.stop() ?? playback.stop(),
 
     seek: (position) => {
       const target = Math.max(0, position);
-      return castPlayer()?.seek(target) ?? mpv.seek(target);
+      return idle() ?? castPlayer()?.seek(target) ?? mpv.seek(target);
     },
     seekBy: (offset) => controls.seek((mpv.props['time-pos'] ?? 0) + offset),
 

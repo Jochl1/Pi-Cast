@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import path from 'node:path';
-import { ACCENTS, STYLES, TWITCH_QUALITIES, isHex } from './shared/theme.js';
+import { ACCENTS, TWITCH_QUALITIES, isHex } from './shared/theme.js';
 
 const bool = (v) => typeof v === 'boolean';
 
@@ -9,7 +9,7 @@ const bool = (v) => typeof v === 'boolean';
 const SCHEMA = {
   accent: { def: 'violet', ok: (v) => v === 'custom' || v in ACCENTS },
   customAccent: { def: '#A898FF', ok: isHex },
-  style: { def: 'aurora', ok: (v) => v in STYLES },
+  // Drifting glows on the boot splash and the home backdrop.
   bootAnimation: { def: true, ok: bool },
   sponsorBlock: { def: true, ok: bool },
   clock24: { def: true, ok: bool },

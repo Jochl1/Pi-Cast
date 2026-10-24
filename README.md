@@ -35,6 +35,15 @@ The installer takes 10–20 minutes on a Pi 3. You can run it again at any time,
 
 What it sets up: mpv, ffmpeg, Node.js 22, yt-dlp and streamlink (in `.venv/`), the fonts, the SponsorBlock script, a `picast` service that starts at boot, a daily yt-dlp/streamlink update (YouTube breaks old versions regularly), Wi-Fi power saving turned off, and the boot splash.
 
+**Optional: the drifting home background.** The Pi paints a still background itself. The animated one is a set of video loops, one per accent color, too slow to make on a Pi 3. Render them on a computer with Node.js and ffmpeg (about 20 s and 50 MB each), then copy them over:
+
+```sh
+node scripts/render-backdrops.js
+scp data/backdrops/*.mp4 <your-user>@picast.local:Pi-Cast/data/backdrops/
+```
+
+Pi-Cast picks them up the next time it starts or the accent changes, while "Animations" is on.
+
 ## 3. iPhone
 
 ### Remote (web app)
@@ -42,7 +51,7 @@ What it sets up: mpv, ffmpeg, Node.js 22, yt-dlp and streamlink (in `.venv/`), t
 1. Open **http://picast.local:8080** in Safari.
 2. Tap **Share → Add to Home Screen**.
 
-You get the remote (play/pause, ±10 s, volume, "Play a link", Recent) and all settings (accent color, style, device name, Twitch quality, SponsorBlock, clock, TV remote options).
+You get the remote (play/pause, ±10 s, volume, "Play a link", Recent) and all settings (accent color, animations, device name, Twitch quality, SponsorBlock, clock, TV remote options).
 
 ### "Send to Pi-Cast" in the share sheet
 

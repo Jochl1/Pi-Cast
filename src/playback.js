@@ -15,6 +15,11 @@ import { edl } from './ytdl.js';
  *  'started' - the first frame of a new item is on screen
  *  'change' - owner, source, metadata or loading changed
  *  'play' ({ owner, url, kind }) - a new item was requested
+ *  'loaded' - mpv opened the current item
+ *
+ * While nothing plays, mpv shows the home screen's backdrop as a looping
+ * "file" (see setBackground). Its events are filtered out here, so to the
+ * rest of the app it looks like idle.
  */
 export default class Playback extends EventEmitter {
   /** `getTwitchQuality` returns the streamlink quality list to use for the next stream. */
@@ -37,19 +42,43 @@ export default class Playback extends EventEmitter {
     this.loading = false;
     // Timestamps of the current load, logged once the first frame shows.
     this.timing = null;
+    // The backdrop: `file` to show; `loaded` and `id` = the file last handed to
+    // mpv and its playlist entry; `showing` while that's mpv's current file;
+    // `failed` = a file that didn't open.
+    this.background = { file: null, loaded: null, id: null, showing: false, failed: null };
 
-    mpv.on('start-file', () => {
+    mpv.on('ready', () => {
+      // A (re)started mpv is idle.
+      Object.assign(this.background, { id: null, showing: false });
+      this.#toIdle();
+    });
+    mpv.on('start-file', (id) => {
+      this.background.showing = id != null && id === this.background.id;
+      if (this.background.showing) return;
       this.switching = false;
       this.#mark('start-file');
     });
-    mpv.on('file-loaded', () => this.#mark('file-loaded'));
+    mpv.on('file-loaded', () => {
+      if (this.background.showing) return;
+      this.#mark('file-loaded');
+      if (this.source) this.emit('loaded');
+    });
     mpv.on('playback-restart', () => {
-      if (!this.loading) return;
+      if (!this.loading || this.background.showing) return;
       this.#mark('first frame');
       this.#setLoading(false);
       this.emit('started');
     });
-    mpv.on('end-file', (reason) => {
+    mpv.on('end-file', (reason, id) => {
+      const bg = this.background;
+      if (id != null && id === bg.id) {
+        bg.showing = false;
+        if (reason === 'error') {
+          bg.failed = bg.file;
+          this.log.warn(`couldn't show the background ${bg.file}`);
+        }
+        return;
+      }
       if (this.switching || (reason !== 'eof' && reason !== 'error')) return;
       this.#setLoading(false);
       const { owner } = this;
@@ -57,7 +86,37 @@ export default class Playback extends EventEmitter {
       this.streamlink.close();
       this.log.info(`playback ended (${reason})`);
       this.emit('ended', { owner, reason });
+      this.#toIdle();
     });
+  }
+
+  /** Sets the backdrop shown while nothing plays (a PNG or a looping clip). */
+  setBackground(file) {
+    if (this.background.file === file) return;
+    this.background.file = file;
+    if (!this.source) this.#toIdle();
+  }
+
+  /** Shows the backdrop, or stops mpv if there's none. */
+  async #toIdle() {
+    if (!this.mpv.socket) return; // done again on 'ready'
+    try {
+      if (!(await this.#showBackground())) await this.mpv.stop();
+    } catch (e) {
+      this.log.debug('going idle failed:', e.message);
+    }
+  }
+
+  /** Loads the backdrop unless it's already showing; false if there's none to show. */
+  async #showBackground() {
+    const bg = this.background;
+    const { file } = bg;
+    if (!file || bg.failed === file) return false;
+    if (bg.showing && bg.loaded === file) return true;
+    await this.mpv.set('image-display-duration', 'inf');
+    const id = await this.mpv.load(file, { loop: true });
+    Object.assign(bg, { loaded: file, id });
+    return true;
   }
 
   #setLoading(on) {
@@ -87,6 +146,7 @@ export default class Playback extends EventEmitter {
   async play(url, { owner, start = 0 }) {
     const kind = classify(url);
     const previous = this.owner;
+    const wasPlaying = !!this.source;
     this.switching = true;
     this.timing = { request: Date.now() };
     this.loading = true;
@@ -117,8 +177,9 @@ export default class Playback extends EventEmitter {
       } else {
         let direct = null;
         if (kind === 'youtube') {
-          // Resolving takes seconds: show the loading screen, not the old video under it.
-          if (!this.mpv.props['idle-active']) await this.mpv.stop().catch(() => {});
+          // Resolving takes seconds: show the loading screen over the
+          // backdrop, not over the old video.
+          if (wasPlaying) await this.#toIdle();
           direct = await this.#resolve(url);
         }
         if (this.source !== source) {
@@ -145,8 +206,8 @@ export default class Playback extends EventEmitter {
       this.switching = false;
       if (this.source === source) this.#clear();
       // Don't leave the previous item playing unowned.
+      if (!this.source) await this.#toIdle();
       await this.streamlink.close();
-      await this.mpv.stop().catch(() => {});
       throw e;
     }
   }
@@ -166,7 +227,7 @@ export default class Playback extends EventEmitter {
   async stop() {
     this.#clear();
     // Stop mpv before killing streamlink, so the stream's end is seen as a 'stop'.
-    await this.mpv.stop();
+    await this.#toIdle();
     await this.streamlink.close();
   }
 
@@ -180,13 +241,13 @@ export default class Playback extends EventEmitter {
       title: s?.title ?? (s ? p['media-title'] : null),
       channel: s?.channel ?? null,
       thumbnail: s?.thumbnail ?? null,
-      idle: !!p['idle-active'],
+      idle: !s || !!p['idle-active'],
       // Between asking for a video and its first frame (yt-dlp is slow on a Pi 3).
       loading: !!s && (this.loading || !!p['paused-for-cache']),
-      paused: !!p.pause,
+      paused: !!s && !!p.pause,
       live: s?.kind === 'twitch',
-      position: p['time-pos'] ?? 0,
-      duration: p.duration ?? 0,
+      position: s ? p['time-pos'] ?? 0 : 0,
+      duration: s ? p.duration ?? 0 : 0,
       volume: Math.round(p.volume ?? 100),
       muted: !!p.mute,
     };

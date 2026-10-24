@@ -14,7 +14,8 @@ const SCRIPTS_DIR = path.join(ROOT, 'mpv-scripts');
  * Runs a single long-lived mpv instance (idle, fullscreen on the TV) and
  * talks to it over its JSON IPC socket. Restarts mpv if it crashes.
  *
- * Events: 'property' (name, value), 'end-file' (reason), 'start-file', 'file-loaded',
+ * Events: 'property' (name, value), 'end-file' (reason, playlist entry id),
+ * 'start-file' (playlist entry id), 'file-loaded',
  * 'playback-restart' (first frame after a load or seek), 'ready',
  * 'log' (text of an mpv error message)
  * ('property' also fires for the polled 'time-pos')
@@ -178,6 +179,13 @@ export default class Mpv extends EventEmitter {
       else p.reject(new Error(`mpv: ${msg.error}`));
       return;
     }
+    // Events go out after the code awaiting a reply has run, even when both
+    // arrive in one chunk: e.g. loadfile's playlist_entry_id is known before
+    // that file's start-file is handled.
+    setImmediate(() => this.#onEvent(msg));
+  }
+
+  #onEvent(msg) {
     switch (msg.event) {
       case 'property-change':
         this.props[msg.name] = msg.data ?? null;
@@ -185,9 +193,11 @@ export default class Mpv extends EventEmitter {
         break;
       case 'end-file':
         this.log.debug('mpv end-file', msg.reason, msg.file_error ?? '');
-        this.emit('end-file', msg.reason);
+        this.emit('end-file', msg.reason, msg.playlist_entry_id);
         break;
       case 'start-file':
+        this.emit('start-file', msg.playlist_entry_id);
+        break;
       case 'file-loaded':
       case 'playback-restart':
         this.emit(msg.event);
@@ -237,14 +247,19 @@ export default class Mpv extends EventEmitter {
     return this.command('set_property', name, value);
   }
 
-  /** `headers`: HTTP header lines ("Name: value") for the stream requests. */
-  async load(url, { start = 0, title = '', headers = [] } = {}) {
+  /**
+   * `headers`: HTTP header lines ("Name: value") for the stream requests.
+   * Resolves to the new playlist entry's id.
+   */
+  async load(url, { start = 0, title = '', headers = [], loop = false } = {}) {
     // These are global options, so reset them on every load.
     await this.set('start', start > 0 ? String(start) : 'none');
     await this.set('force-media-title', title);
     await this.set('http-header-fields', headers);
+    await this.set('loop-file', loop ? 'inf' : 'no');
     await this.set('pause', false);
-    await this.command('loadfile', url, 'replace');
+    const result = await this.command('loadfile', url, 'replace');
+    return result?.playlist_entry_id ?? null;
   }
 
   stop() { return this.command('stop'); }

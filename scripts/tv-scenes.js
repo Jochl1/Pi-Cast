@@ -1,11 +1,11 @@
 // Sample TV screens, shared by preview-tv.js (PNG previews) and check-osd.js
 // (fit test on the Pi). Each scene's layers are lists of ASS events, in the
 // same stacking order the app uses. Scenes without `video` sit on the
-// style's background color, which mpv draws itself.
+// background color, which mpv draws itself (the app shows a backdrop image there).
 import { ACCENTS } from '../src/shared/theme.js';
 import * as screens from '../src/tv/screens.js';
 
-const base = { accent: 'violet', customAccent: '#A898FF', style: 'aurora', clock24: true, bootAnimation: true, sponsorBlock: true, cecSwitchInput: true };
+const base = { accent: 'violet', customAccent: '#A898FF', clock24: true, bootAnimation: true, sponsorBlock: true, cecSwitchInput: true };
 const now = new Date(2026, 9, 24, 21, 34);
 const homeState = {
   now, clock24: true, net: { kind: 'wifi', ssid: 'Home', signal: 70 },
@@ -20,8 +20,8 @@ const swatches = Object.entries(ACCENTS).map(([id, a]) => ({ id, hex: a.hex, sel
 
 export const scenes = {
   home: { settings: base, layers: (t) => [screens.home(t, homeState)] },
-  'home-12h-midnight': {
-    settings: { ...base, style: 'midnight', accent: 'amber' },
+  'home-12h-amber': {
+    settings: { ...base, accent: 'amber' },
     layers: (t) => [screens.home(t, { ...homeState, clock24: false })],
   },
   loading: {
@@ -38,10 +38,10 @@ export const scenes = {
     layers: (t) => [screens.home(t, { ...homeState, panelOpen: true }),
       screens.settingsPanel(t, { settings: base, focus: 0, swatches })],
   },
-  'settings-studio': {
-    settings: { ...base, style: 'studio' },
+  'settings-focus': {
+    settings: base,
     layers: (t) => [screens.home(t, { ...homeState, panelOpen: true }),
-      screens.settingsPanel(t, { settings: { ...base, style: 'studio' }, focus: 2, swatches })],
+      screens.settingsPanel(t, { settings: base, focus: 2, swatches })],
   },
   toast: { settings: base, video: true, layers: (t) => [screens.toast(t, toastText)] },
   // Worst cases: the biggest screens with a toast on top.

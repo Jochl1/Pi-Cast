@@ -206,13 +206,6 @@ input[type="range"] { flex-grow: 1; accent-color: var(--accent); height: 28px; }
 .value-select { position: relative; color: var(--muted); min-height: 44px; display: flex; align-items: center; gap: 4px; }
 .value-select select { position: absolute; inset: 0; opacity: 0; width: 100%; font-size: 16px; }
 
-.segmented { display: flex; gap: 8px; }
-.segmented button {
-  flex: 1; min-height: 44px; border: 1px solid var(--dim); border-radius: var(--small);
-  background: transparent; font-size: 14px; font-weight: 500;
-}
-.segmented button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
-
 .switch {
   width: 56px; height: 44px; margin-right: -4px; border: 0; padding: 0; background: transparent;
   display: flex; align-items: center; justify-content: flex-end;

@@ -10,7 +10,7 @@ export const SPLASH_DIR = path.join(DATA_DIR, 'plymouth');
 // Installed by deploy/install.sh; copies SPLASH_DIR into the Plymouth theme
 // and rebuilds the initramfs. Allowed via a sudoers rule for this one command.
 const UPDATE_HELPER = '/usr/local/sbin/picast-plymouth-update';
-const SPLASH_KEYS = ['accent', 'customAccent', 'style', 'bootAnimation'];
+const SPLASH_KEYS = ['accent', 'customAccent', 'bootAnimation'];
 
 const svg = (w, h, body) => `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${body}</svg>`;
 
@@ -38,9 +38,8 @@ export async function buildSplash(settings, outDir = SPLASH_DIR) {
   }).join('')));
   await put('status.png', svg(360, 48, `<text x="180" y="36" text-anchor="middle" font-family="Sora"
     font-size="33" letter-spacing="2.6" fill="${t.muted}">${xml('STARTING UP')}</text>`));
-  // Transparent 1x1 glows for the flat styles keep the script the same.
-  await put('glow-a.png', t.glow ? glowSvg(1080, t.accent, 0.45) : svg(1, 1, ''));
-  await put('glow-b.png', t.glow ? glowSvg(990, t.accent, 0.30) : svg(1, 1, ''));
+  await put('glow-a.png', glowSvg(1080, t.accent, 0.45));
+  await put('glow-b.png', glowSvg(990, t.accent, 0.30));
 
   const bg = parseColor(t.bg);
   const script = fs.readFileSync(path.join(ROOT, 'deploy', 'plymouth', 'picast.script.in'), 'utf8')

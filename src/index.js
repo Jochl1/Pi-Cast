@@ -67,13 +67,15 @@ function pushStatus() {
   }, 150);
 }
 events.setSnapshot(() => ({ status: getStatus(), settings: settings.get(), recent: recent.list() }));
-mpv.on('property', pushStatus);
+// The polled time-pos only matters while something plays (the backdrop ticks too).
+mpv.on('property', (name) => {
+  if (name !== 'time-pos' || playback.source) pushStatus();
+});
 playback.on('change', pushStatus);
 cast.on('change', pushStatus);
 
-mpv.on('file-loaded', () => {
+playback.on('loaded', () => {
   const s = playback.source;
-  if (!s) return;
   const { url, kind, thumbnail, channel } = s;
   recent.add({ url, kind, title: s.title ?? mpv.props['media-title'] ?? url, channel, thumbnail })
     .then(() => events.send('recent', recent.list()))
@@ -85,15 +87,15 @@ mpv.on('file-loaded', () => {
 // waits until nothing is playing.
 let mpvRestartPending = false;
 function restartMpvWhenIdle() {
-  if (mpv.props['idle-active'] && !playback.source) {
+  if (!playback.source) {
     mpvRestartPending = false;
     mpv.restart();
   } else {
     mpvRestartPending = true;
   }
 }
-mpv.on('property', (name, value) => {
-  if (name === 'idle-active' && value && mpvRestartPending) restartMpvWhenIdle();
+playback.on('change', () => {
+  if (mpvRestartPending) restartMpvWhenIdle();
 });
 
 settings.on('change', (values, changed) => {
@@ -113,7 +115,7 @@ const tv = new Tv({
 });
 tv.start();
 
-// Keeps the Plymouth boot splash in the current accent/style.
+// Keeps the Plymouth boot splash in the current accent.
 new BootSplash({ settings, log });
 
 // --- TV remote (HDMI-CEC) ---

@@ -1,6 +1,7 @@
-import { ACCENTS, STYLE_ORDER, themeFor } from '../shared/theme.js';
+import { ACCENTS, themeFor } from '../shared/theme.js';
 import { networkStatus } from '../network.js';
 import { thumbnailBgra } from './thumbnail.js';
+import { backgroundClip, backgroundPng } from './background.js';
 import * as screens from './screens.js';
 
 // osd-overlay ids; higher z draws on top. The thumbnail is an overlay-add
@@ -34,6 +35,7 @@ export default class Tv {
     this.thumb = { want: null, shown: null }; // { file, x, y, w, h }
     this.timer = null;
     this.scheduled = false;
+    this.backdropKey = null;
   }
 
   start() {
@@ -58,20 +60,43 @@ export default class Tv {
       this.render();
     });
     cast.on('change', () => this.render());
-    settings.on('change', () => this.render());
+    settings.on('change', () => {
+      this.#updateBackdrop();
+      this.render();
+    });
 
     this.#tickClock();
     this.#pollNetwork();
+    this.#updateBackdrop();
     this.render();
   }
 
   /** 'home' | 'loading' | 'playing' | 'paused' */
   screen() {
     const p = this.mpv.props;
-    const source = this.playback.source;
-    if (!source) return p['idle-active'] ? 'home' : 'playing';
-    if (p['idle-active'] || this.playback.loading) return 'loading';
+    const { source, loading, background } = this.playback;
+    if (!source) return 'home';
+    if (p['idle-active'] || background.showing || loading) return 'loading';
     return p.pause ? 'paused' : 'playing';
+  }
+
+  /**
+   * The home screen's backdrop, shown by mpv on its video plane (it would
+   * never fit the OSD texture): the drifting loop clip if animation is on and
+   * one was rendered for this look, otherwise a still image painted here.
+   */
+  async #updateBackdrop() {
+    const s = this.settings.get();
+    const t = themeFor(s);
+    const key = `${t.accent} ${s.bootAnimation}`;
+    if (key === this.backdropKey) return;
+    this.backdropKey = key;
+    try {
+      const file = (s.bootAnimation && backgroundClip(t)) || await backgroundPng(t);
+      if (this.backdropKey === key) this.playback.setBackground(file);
+    } catch (e) {
+      this.log.warn('TV background image failed:', e.message);
+    }
   }
 
   toast(text) {
@@ -113,8 +138,6 @@ export default class Tv {
       const list = Object.keys(ACCENTS);
       if (s.accent === 'custom') list.push('custom');
       patch = { accent: cycle(list, s.accent) };
-    } else if (key === 'style') {
-      patch = { style: cycle(STYLE_ORDER, s.style) };
     } else {
       patch = { [key]: !s[key] };
     }

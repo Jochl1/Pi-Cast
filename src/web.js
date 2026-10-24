@@ -69,7 +69,7 @@ export default function createWebServer({
   // Same keys as the TV remote; handy for testing without HDMI-CEC.
   app.post('/api/tv/key', action(({ key }) => ({ ok: true, handled: tv.key(String(key)) })));
 
-  // Icons follow the current accent and style.
+  // Icons follow the current accent.
   const sendIcon = (size) => async (req, res) => {
     try {
       res.set('Cache-Control', 'no-cache');

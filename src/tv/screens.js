@@ -1,4 +1,3 @@
-import { STYLES } from '../shared/theme.js';
 import {
   text, span, rect, circle, arcBand, escape, fit, textWidth,
 } from './ass.js';
@@ -17,7 +16,7 @@ export const W = 1920;
 export const H = 1080;
 const PAD_X = 96;
 const PAD_Y = 84;
-// Colors used over video, from the design (independent of the style).
+// Colors used over video, from the design.
 const ON_VIDEO = { text: '#F2F4F7', muted: '#B4BCC8', track: 'rgba(255,255,255,0.2)', dim: 'rgba(6,8,12,0.62)' };
 const SOURCE = { youtube: 'YouTube', twitch: 'Twitch', generic: 'Link' };
 
@@ -200,15 +199,13 @@ export function paused(t, { title, channel, kind, position, duration, live }) {
 /** Rows of the TV settings panel, in order. */
 export const PANEL_ROWS = [
   { key: 'accent', label: 'Accent color' },
-  { key: 'style', label: 'Style' },
-  { key: 'bootAnimation', label: 'Animated boot' },
+  { key: 'bootAnimation', label: 'Animations' },
   { key: 'sponsorBlock', label: 'Skip sponsors' },
   { key: 'clock24', label: 'Clock' },
   { key: 'cecSwitchInput', label: 'Switch TV input' },
 ];
 
 function panelValue(key, s) {
-  if (key === 'style') return `‹ ${STYLES[s.style].label} ›`;
   if (key === 'clock24') return s.clock24 ? '24h' : '12h';
   return s[key] ? 'On' : 'Off';
 }

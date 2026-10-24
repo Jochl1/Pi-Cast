@@ -20,21 +20,19 @@ Out of scope:
 
 The approved mock-ups are in `docs/design/design-draft.dc.html`; its `<script>` has the exact values. The tokens live in `src/shared/theme.js`, which the server and the web app both use.
 
-**Default: style Aurora, accent Violet, logo Wordmark, font Sora.**
+**Style Aurora, accent Violet by default, logo Wordmark, font Sora.**
 
-### Styles
+### Style
 
-| | Aurora (default) | Midnight | Studio |
-|---|---|---|---|
-| Background | `#0C0B14` | `#0A0C10` | `#171614` |
-| Text | `#F5F3FF` | `#F2F4F7` | `#EEEBE4` |
-| Muted | `#A9A6C4` | `#98A2B3` | `#A9A59B` |
-| Radius | 20 cards, 12 small, 999 pills | 14 | 4 |
-| Glow | yes | no | no |
+Aurora is the only style; the draft's Midnight and Studio were dropped (the user wanted the colourful one).
 
-Aurora also has surfaces `rgba(255,255,255,0.07)`, lines `rgba(255,255,255,0.10)`, dim `rgba(255,255,255,0.16)`, glass pop-ups `rgba(16,14,30,0.72)` and an icon background of `#15132A`.
+- Background `#0C0B14`, text `#F5F3FF`, muted `#A9A6C4`.
+- Surfaces `rgba(255,255,255,0.07)`, lines `rgba(255,255,255,0.10)`, dim `rgba(255,255,255,0.16)`, glass pop-ups `rgba(16,14,30,0.72)`, icon background `#15132A`.
+- Radius 20 for cards, 12 small, 999 pills.
 
-**Aurora glow:** two large, soft radial blobs in the accent colour, one at the top left (about 45% alpha) and one at the bottom right (about 30%). The boot splash draws them. The TV home screen can't at the moment (see §4.2).
+**Aurora glow:** large, soft radial lights in the accent colour. The boot splash draws two (top left about 45% alpha, bottom right about 30%).
+
+**Home backdrop** (`src/tv/background.js`): the accent (more saturated) at the top left, a neighbouring hue (+55°) at the bottom right and a faint third light (−35°) at the top right, on a base that's slightly lighter at the top, with a vignette and a frosted glass card behind "Ready to cast". With "Animations" on, the lights drift slowly on a 30 s loop.
 
 ### Accents
 
@@ -49,13 +47,13 @@ There are 10 presets plus a custom colour: Violet `#A898FF` (default), Sky `#6FA
 ### Screens
 
 1. **Boot splash (Plymouth):** the wordmark centred, three dots below it (the middle one in the accent), "STARTING UP" at the bottom, and the two glows drifting slowly on 14–18 s loops. The "Animated boot" setting freezes them.
-2. **Home:** a large clock (24h/12h) and the date at the top left, Wi-Fi status at the top right, "Ready to cast" with a one-line hint in the centre, and a bottom bar with the TV code (pairing code), the remote address and a small wordmark.
+2. **Home:** the backdrop above, a large clock (24h/12h) and the date at the top left, Wi-Fi status at the top right, "Ready to cast" with a one-line hint in the centre, and a bottom bar with the TV code (pairing code), the remote address and a small wordmark.
 3. **Loading:** shown while a new item starts, with the title and the sender when they're known.
 4. **Now-playing pop-ups** that fade after about 5 s: a "<sender> connected" pill at the top right; a card at the bottom left with the thumbnail, "NOW PLAYING" in the accent, the title, and the source and quality; and a thin accent progress line.
 5. **Paused:** dimmed video, a pause icon in an accent ring, and at the bottom the title, channel and source, an accent progress bar, and the elapsed and total times in mono.
-6. **TV settings panel:** a glass panel on the right over the dimmed home screen. Rows: accent (a swatch row), style, animated boot, skip sponsors, clock, switch TV input. Footer: "◀ ▶ change · OK select · Back close". OK on the home screen opens it; the arrows and Back navigate it.
+6. **TV settings panel:** a glass panel on the right over the dimmed home screen. Rows: accent (a swatch row), animations, skip sponsors, clock, switch TV input. Footer: "◀ ▶ change · OK select · Back close". OK on the home screen opens it; the arrows and Back navigate it.
 7. **Toasts** for short messages, such as "Couldn't play that link".
-8. **iPhone web app:** a header with the wordmark and a "● <TV name>" pill; a now-playing card (thumbnail, state, title and channel, progress, back 10 s / play-pause / forward 10 s, volume); a "Play a link" field; and a Recent list. Settings: the accent grid (5×2) and a custom colour; style and animated boot; device name, Twitch quality, SponsorBlock, 24-hour clock; and the CEC toggles ("Control with TV remote", "Switch TV input on cast").
+8. **iPhone web app:** a header with the wordmark and a "● <TV name>" pill; a now-playing card (thumbnail, state, title and channel, progress, back 10 s / play-pause / forward 10 s, volume); a "Play a link" field; and a Recent list. Settings: the accent grid (5×2) and a custom colour; animations; device name, Twitch quality, SponsorBlock, 24-hour clock; and the CEC toggles ("Control with TV remote", "Switch TV input on cast").
 
 ## 3. Architecture
 
@@ -80,6 +78,7 @@ Node 22 (ESM), with `express` and `yt-cast-receiver` as the only dependencies an
 | `tv/` | TV renderer: `tv.js` (state, layers, timers), `screens.js` (pure layout to ASS), `ass.js` (ASS helpers), `thumbnail.js`. |
 | `cec.js` | TV remote over `cec-client`. |
 | `boot.js`, `render.js`, `icons.js` | Boot splash images, SVG to PNG via `rsvg-convert` (cached by content), app icons. |
+| `tv/background.js` | Paints the home backdrop (PNG) and finds its loop clip. |
 | `network.js` | Wi-Fi status via `nmcli`. |
 
 ### Playback ownership
@@ -87,6 +86,13 @@ Node 22 (ESM), with `express` and `yt-cast-receiver` as the only dependencies an
 `Playback` is the only thing that loads or stops media, so the cast receiver and the web app never fight over mpv. `owner` is `'cast'`, `'web'` or `null`. A new request from the other side emits `takeover`, and the cast session is told it lost the screen. While a new item replaces the old one (`switching`), the old item's `end-file` is ignored. `ended` reports `eof` or `error`.
 
 `controls.js` routes through the cast player while `owner === 'cast'`, so the phone that's casting stays in sync.
+
+**The backdrop is an mpv "file".** While nothing plays, `Playback` keeps the home backdrop loaded (`loop-file=inf`, `image-display-duration=inf`), so mpv is never really idle:
+- It's put back after every stop, `ended`, failed play and mpv restart (`#toIdle`). Switching from one YouTube video to the next loads it too, so the loading screen sits on the backdrop instead of the old video.
+- It's recognised by its playlist entry id. Its `start-file`/`file-loaded`/`playback-restart`/`end-file` events are ignored: they don't clear `switching` or `loading`, emit `ended`, or add to Recent (Recent listens to Playback's own `loaded`).
+- mpv sends events after the reply that's awaiting them (`setImmediate` in `mpv.js`), so the id from `loadfile` is known before that file's `start-file` arrives.
+- To the rest of the app it's idle: `status()` reports `idle` with no position, `Tv.screen()` is `'home'` without a source, and the controls ignore pause/seek without one. The SponsorBlock restart waits for "no source" instead of `idle-active`.
+- If it fails to open, it's not retried; mpv's `background-color` stays as the fallback.
 
 ### mpv
 
@@ -127,7 +133,10 @@ streamlink with `--player-external-http` on `127.0.0.1`; Pi-Cast waits for its U
 
 - Text and shapes are ASS `osd-overlay`s at 1920×1080, one per layer: home, pop-up, pause, panel, toast, in that z order.
 - The thumbnail is an `overlay-add` raw BGRA bitmap converted with ffmpeg.
-- The home and loading screen colour is mpv's `background-color`, not a shape (see §4.2). It's black during playback.
+- **The home backdrop** is shown by mpv on its video plane (see Playback ownership), so it costs no OSD texture.
+  - The still version is painted in floating point by `background.js` in a worker thread (about 10 s on a throttled Pi, cached by content in `data/background/`) and dithered by about one level. Rounding the dark, soft gradients straight to 8 bits banded badly on the TV.
+  - The animated version is a looping H.264 clip (1080p, 10 fps, 30 s, CRF 10 with `-tune grain`, about 48 MB). Painting 300 frames takes far too long on a Pi 3 and its hardware encoder bands, so `scripts/render-backdrops.js` renders one per accent preset **on a PC**; they're copied to the Pi's `data/backdrops/` (not in git). A custom accent, or a missing clip, falls back to the still image. Plays hardware-decoded at about 9% CPU.
+  - mpv's `background-color` (the style's background on home and loading, black during playback) is the fallback while the image is painted.
 - Redraws only happen when something visible changes: the clock once a minute, the progress once a second, and only while the pause screen or a card is showing. Nothing is drawn while mpv is disconnected, and failed overlay commands are logged.
 - Dimming (pause screen, settings panel) is an ASS rectangle, because mpv's video equalizer doesn't apply in overlay mode (§4.1).
 - `scripts/tv-scenes.js` holds the sample screens. `scripts/preview-tv.js` renders them to PNG with any libass ffmpeg; `scripts/check-osd.js` draws them in a real mpv on the Pi and fails on OSD errors.
@@ -150,7 +159,8 @@ streamlink with `--player-external-http` on `127.0.0.1`; Pi-Cast waits for its U
 
 | Setting | Effect |
 |---|---|
-| Accent, style | Redraw the overlays, regenerate the icons and the boot splash. |
+| Accent | Redraw the overlays, switch the home backdrop, regenerate the icons and the boot splash. |
+| Animations | Boot splash glows on/off; home backdrop clip or still image. |
 | Device name | Restart the cast receiver and CEC. |
 | Twitch quality | Takes effect on the next stream. |
 | SponsorBlock | Restart mpv when idle. |
@@ -187,13 +197,20 @@ Measured on a Pi 3 with Raspberry Pi OS Lite 64-bit (Trixie, mpv 0.40, Mesa 26).
 - **The overflow is sticky.** Once one screen overflows, every later screen fails too, even ones that fit on their own, until mpv restarts. An Aurora home screen with a full-screen rectangle and blurred glows caused exactly this, so no overlay showed at all.
 - **Blur is expensive:** libass pads blurred bitmaps heavily. Even one blurred ring per glow didn't fit home plus the settings panel.
 - **A shape with `\bord` makes two full-size bitmaps** (fill and border).
-- So: no full-screen shapes and no big blurred glows. The home background is mpv's `background-color`.
+- So: no full-screen shapes and no big blurred glows in the overlays. The home backdrop is a picture on the video plane instead (§3, TV renderer).
 - Test the worst case (home plus settings panel plus toast) with `scripts/check-osd.js` after any layout change.
 - `overlay-add` bitmaps (thumbnails) use a separate texture, but mpv always draws them **above** every ASS overlay. That's why the glow isn't a bitmap background behind the text.
 - mpv removes a client's `osd-overlay`s when that IPC client disconnects. Test scripts must keep the socket open while someone looks at the TV.
 - Tried without success: the glows as a single ASS event on the normal OSD-text texture (`osd-msg1` with `${osd-ass-cc/0}`). It fit, but nothing showed. The cause is unknown (possibly idle, `osd-level` or the markup).
 
-### 4.3 Power
+### 4.3 Home backdrop
+
+- A PNG loaded into mpv (`image-display-duration=inf`) is drawn through GL onto the draw plane, under the OSD overlays. A hardware-decoded H.264 clip goes on the video plane. Both work with the overlays on top and no flicker.
+- Dark, soft 8-bit gradients band visibly on this TV. A dither of about one level fixes it. Film grain via an SVG `feTurbulence` filter was far too strong, because rsvg runs filters in linear RGB.
+- The dither has to survive encoding: CRF 16 x264 banded again, CRF 10 with `-tune grain` doesn't. Half resolution (540p, scaled up by the display) looked blotchy.
+- The Pi 3's hardware encoder (`h264_v4l2m2m`) ignored the bitrate and came out blocky. x264 manages about 3 fps at 1080p on a throttled Pi, and painting a frame in JS took about 0.7 s even after optimising, so the clips are rendered on a PC.
+
+### 4.4 Power
 
 The Pi 3 throttles from 1200 to 600 MHz on undervoltage (`vcgencmd get_throttled` reports `0x50005`). That roughly halves everything CPU-bound, yt-dlp especially, and writing to the SD card on low voltage corrupts it. Use the official 5.1 V / 2.5 A supply.
 
@@ -202,8 +219,10 @@ The Pi 3 throttles from 1200 to 600 MHz on undervoltage (`vcgencmd get_throttled
 - **Faster YouTube start.** What's left of the ~7 s is mostly network (~1.5 s) and Node solving the challenge (2–4 s).
   - Options: a Node solver that stays running instead of one Node per video; resolving the next queued video ahead of time.
   - A proper power supply is likely the biggest single win.
-- **Bland home screen.** Without the glows, Aurora is a plain dark colour. Options within §4.2:
-  - a pre-rendered background image on the free video plane while idle;
-  - finding out why the OSD-text texture route didn't show;
-  - small budgeted accents.
 - **TV black with a signal** happened once, and power-cycling the TV fixed it. If it comes back, test whether CEC is involved by turning it off in the web app.
+
+### Ideas for later (from the user, not designed yet)
+
+- **Instagram on the TV:** Reels/feed scrolled with the remote's arrow keys, a like button (OK), and login by scanning a QR code on the TV with the phone.
+- **UI sounds:** a small, clean sound set for navigation, opening the panel, toasts and playback start.
+- **Party games with the phone as controller:** Pong, Connect 4, tic-tac-toe and other simple games. The TV shows the game; phones join through the web app (QR code) and send input over the same HTTP/SSE channel.

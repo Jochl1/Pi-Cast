@@ -1,8 +1,7 @@
-import { ACCENTS, STYLES, TWITCH_QUALITIES, themeFor } from '/shared/theme.js';
+import { ACCENTS, TWITCH_QUALITIES, themeFor } from '/shared/theme.js';
 
 const $ = (id) => document.getElementById(id);
 const SOURCE_LABEL = { youtube: 'YouTube', twitch: 'Twitch', generic: 'Link' };
-const STYLE_TABS = ['midnight', 'aurora', 'studio']; // order as in the design
 
 const state = {
   status: null,
@@ -261,15 +260,6 @@ function buildSettings() {
     return b;
   }));
 
-  $('styles').replaceChildren(...STYLE_TABS.map((id) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.dataset.style = id;
-    b.textContent = STYLES[id].label;
-    b.addEventListener('click', () => change({ style: id }));
-    return b;
-  }));
-
   // Color pickers fire 'input' continuously; only save the final pick.
   $('custom-color').addEventListener('change', (e) => change({ accent: 'custom', customAccent: e.target.value.toUpperCase() }));
 
@@ -297,7 +287,6 @@ function renderSettings() {
   applyTheme(s);
   renderPill();
   for (const b of $('swatches').children) b.setAttribute('aria-pressed', String(s.accent === b.dataset.accent));
-  for (const b of $('styles').children) b.setAttribute('aria-pressed', String(s.style === b.dataset.style));
   $('custom-color').value = s.accent === 'custom' ? s.customAccent : themeFor(s).accent;
   for (const sw of document.querySelectorAll('.switch[data-setting]')) {
     sw.setAttribute('aria-pressed', String(!!s[sw.dataset.setting]));
