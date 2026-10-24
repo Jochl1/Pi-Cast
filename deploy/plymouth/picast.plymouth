@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Pi-Cast
+Description=Pi-Cast boot splash: wordmark and a slowly drifting accent glow
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/picast
+ScriptFile=/usr/share/plymouth/themes/picast/picast.script

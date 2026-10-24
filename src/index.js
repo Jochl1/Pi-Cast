@@ -14,6 +14,7 @@ import createWebServer from './web.js';
 import ReceiverStore from './receiverStore.js';
 import Tv from './tv/tv.js';
 import Cec from './cec.js';
+import BootSplash from './boot.js';
 import { themeFor } from './shared/theme.js';
 
 const config = loadConfig();
@@ -109,6 +110,9 @@ const tv = new Tv({
   remote: `${os.hostname()}.local:${config.webPort}`,
 });
 tv.start();
+
+// Keeps the Plymouth boot splash in the current accent/style.
+new BootSplash({ settings, log });
 
 // --- TV remote (HDMI-CEC) ---
 const cec = new Cec({ name: settings.get().deviceName, log });
