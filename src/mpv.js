@@ -65,7 +65,7 @@ export default class Mpv extends EventEmitter {
   }
 
   #spawn() {
-    const { mpvPath, mpvSocket, mpvHwdec, ytdlPath, mpvExtraArgs } = this.config;
+    const { mpvPath, mpvSocket, mpvHwdec, mpvAudioDevice, ytdlPath, mpvExtraArgs } = this.config;
     if (process.platform !== 'win32') fs.rmSync(mpvSocket, { force: true });
 
     const scripts = fs.existsSync(SCRIPTS_DIR)
@@ -79,6 +79,7 @@ export default class Mpv extends EventEmitter {
       '--no-terminal',
       `--input-ipc-server=${mpvSocket}`,
       `--hwdec=${mpvHwdec}`,
+      ...(mpvAudioDevice ? [`--audio-device=${mpvAudioDevice}`] : []),
       `--script-opts-append=ytdl_hook-ytdl_path=${ytdlPath}`,
       ...scripts,
       ...mpvExtraArgs,

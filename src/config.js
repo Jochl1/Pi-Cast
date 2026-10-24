@@ -22,6 +22,9 @@ const defaults = {
   mpvSocket: process.platform === 'win32' ? '\\\\.\\pipe\\picast-mpv' : '/tmp/picast-mpv.sock',
   // Hardware decoder for mpv. On a Pi 3 try 'v4l2m2m-copy' (safe) or 'drm' (zero-copy).
   mpvHwdec: 'v4l2m2m-copy',
+  // ALSA device for HDMI audio. The vc4 HDMI driver needs the 'hdmi:' plugin
+  // (it only takes IEC958 frames); 'auto' would pick the headphone jack.
+  mpvAudioDevice: 'alsa/hdmi:CARD=vc4hdmi,DEV=0',
   mpvExtraArgs: [],
 
   ytdlPath: venvBin('yt-dlp'),
