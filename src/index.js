@@ -12,6 +12,7 @@ import Events from './events.js';
 import createControls from './controls.js';
 import createWebServer from './web.js';
 import ReceiverStore from './receiverStore.js';
+import Tv from './tv/tv.js';
 import { themeFor } from './shared/theme.js';
 
 const config = loadConfig();
@@ -101,30 +102,12 @@ settings.on('change', (values, changed) => {
   pushStatus();
 });
 
-// --- Placeholder idle screen (replaced by the TV renderer) ---
-async function updateIdleScreen() {
-  try {
-    if (!mpv.props['idle-active']) {
-      await mpv.clearOverlay();
-      return;
-    }
-    const lines = [
-      `{\\an5\\fs64\\b1}${settings.get().deviceName}`,
-      '{\\fs30\\b0}Ready to cast from the YouTube app',
-      ' ',
-      `{\\fs26}Web: http://${lanAddress()}:${config.webPort}`,
-    ];
-    if (cast.pairingCode) lines.push(`{\\fs26}TV code: ${cast.pairingCode}`);
-    await mpv.showOverlay(lines.join('\\N'));
-  } catch (e) {
-    log.debug('idle screen update failed:', e.message);
-  }
-}
-mpv.on('ready', updateIdleScreen);
-mpv.on('property', (name) => {
-  if (name === 'idle-active') updateIdleScreen();
+// --- TV screens ---
+const tv = new Tv({
+  mpv, playback, cast, settings, log,
+  remote: `${os.hostname()}.local:${config.webPort}`,
 });
-cast.on('pairingCode', updateIdleScreen);
+tv.start();
 
 // --- Start ---
 // Doesn't wait for mpv: it retries in the background if it can't start.
@@ -132,7 +115,7 @@ mpv.start();
 await cast.start(settings.get().deviceName);
 
 const web = createWebServer({
-  playback, controls, settings, recent, events, getStatus, getTheme, log,
+  playback, controls, settings, recent, events, tv, getStatus, getTheme, log,
 });
 web.listen(config.webPort, () => {
   log.info(`Pi-Cast "${settings.get().deviceName}" ready — web app at http://${lanAddress()}:${config.webPort}`);

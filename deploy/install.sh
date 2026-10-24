@@ -78,6 +78,14 @@ install_app() {
   mkdir -p "$REPO/data" "$REPO/mpv-scripts"
 }
 
+install_fonts() {
+  local dest=/usr/local/share/fonts/picast
+  say "Installing the Sora and JetBrains Mono fonts for the TV screens"
+  sudo install -d "$dest"
+  sudo install -m 644 "$REPO"/assets/fonts/*.ttf "$REPO"/assets/fonts/OFL-*.txt "$dest/"
+  sudo fc-cache -f "$dest" >/dev/null
+}
+
 install_sponsorblock() {
   local dest="$REPO/mpv-scripts/sponsorblock_minimal.lua" branch
   [[ -s "$dest" ]] && return
@@ -179,6 +187,7 @@ check_system
 install_packages
 install_node
 install_app
+install_fonts
 install_sponsorblock
 setup_groups
 install_services

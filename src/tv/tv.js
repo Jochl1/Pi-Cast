@@ -1,0 +1,284 @@
+import { ACCENTS, STYLE_ORDER, themeFor } from '../shared/theme.js';
+import { networkStatus } from '../network.js';
+import { thumbnailBgra } from './thumbnail.js';
+import * as screens from './screens.js';
+
+// osd-overlay ids; higher z draws on top. The thumbnail is an overlay-add
+// bitmap, which mpv always draws above all of these.
+const LAYERS = {
+  bg: { id: 1, z: 0 },
+  home: { id: 2, z: 1 },
+  popup: { id: 3, z: 5 },
+  pause: { id: 4, z: 6 },
+  panel: { id: 5, z: 8 },
+  toast: { id: 6, z: 9 },
+};
+const THUMB_OVERLAY = 0;
+const POPUP_MS = 5000;
+const FADE_MS = 600;
+const TOAST_MS = 5000;
+
+/**
+ * Everything drawn on the TV: home screen, loading, now-playing pop-ups,
+ * pause screen, settings panel and toasts. Redraws only when something
+ * visible changes, since every redraw costs CPU on a Pi 3.
+ */
+export default class Tv {
+  constructor({ mpv, playback, cast, settings, log, remote }) {
+    Object.assign(this, { mpv, playback, cast, settings, log, remote });
+    this.sent = {};
+    this.panel = { open: false, focus: 0 };
+    this.card = null; // { until, quality }
+    this.sender = null; // { name, until }
+    this.message = null; // { text, until }
+    this.net = null;
+    this.thumb = { want: null, shown: null }; // { file, x, y, w, h }
+    this.timer = null;
+    this.scheduled = false;
+  }
+
+  start() {
+    const { mpv, playback, cast, settings } = this;
+    mpv.on('ready', () => {
+      // A (re)started mpv has no overlays.
+      this.sent = {};
+      this.thumb.shown = null;
+      this.render();
+    });
+    mpv.on('property', (name) => {
+      // time-pos only matters for the progress bars.
+      if (name !== 'time-pos' || this.screen() === 'paused' || this.card) this.render();
+    });
+    mpv.on('file-loaded', () => this.#onFileLoaded());
+    playback.on('change', () => this.render());
+    playback.on('ended', ({ reason }) => {
+      if (reason === 'error') this.toast("Couldn't play that link");
+    });
+    cast.on('senderConnect', (name) => {
+      this.sender = { name, until: Date.now() + POPUP_MS };
+      this.render();
+    });
+    cast.on('change', () => this.render());
+    settings.on('change', () => this.render());
+
+    this.#tickClock();
+    this.#pollNetwork();
+    this.render();
+  }
+
+  /** 'home' | 'loading' | 'playing' | 'paused' */
+  screen() {
+    const p = this.mpv.props;
+    const source = this.playback.source;
+    if (!source) return p['idle-active'] ? 'home' : 'playing';
+    if (p['idle-active'] || this.playback.switching) return 'loading';
+    return p.pause ? 'paused' : 'playing';
+  }
+
+  toast(text) {
+    this.message = { text, until: Date.now() + TOAST_MS };
+    this.render();
+  }
+
+  /**
+   * Remote keys for the settings panel: 'up' 'down' 'left' 'right' 'ok' 'back'.
+   * Returns true if the key was used (OK on the home screen opens the panel).
+   */
+  key(k) {
+    if (!this.panel.open) {
+      if (k !== 'ok' || this.screen() !== 'home') return false;
+      this.panel = { open: true, focus: 0 };
+      this.render();
+      return true;
+    }
+    const rows = screens.PANEL_ROWS;
+    const row = rows[this.panel.focus];
+    switch (k) {
+      case 'up': this.panel.focus = Math.max(0, this.panel.focus - 1); break;
+      case 'down': this.panel.focus = Math.min(rows.length - 1, this.panel.focus + 1); break;
+      case 'left': this.#change(row.key, -1); break;
+      case 'right': this.#change(row.key, 1); break;
+      case 'ok': this.#change(row.key, 1); break;
+      case 'back': this.panel.open = false; break;
+      default: return false;
+    }
+    this.render();
+    return true;
+  }
+
+  #change(key, dir) {
+    const s = this.settings.get();
+    const cycle = (list, current) => list[(list.indexOf(current) + dir + list.length) % list.length];
+    let patch;
+    if (key === 'accent') {
+      const list = Object.keys(ACCENTS);
+      if (s.accent === 'custom') list.push('custom');
+      patch = { accent: cycle(list, s.accent) };
+    } else if (key === 'style') {
+      patch = { style: cycle(STYLE_ORDER, s.style) };
+    } else {
+      patch = { [key]: !s[key] };
+    }
+    this.settings.update(patch).catch((e) => this.log.warn('TV settings change failed:', e.message));
+  }
+
+  async #onFileLoaded() {
+    const { mpv } = this;
+    let quality = null;
+    try {
+      const [height, fps] = await Promise.all([mpv.get('height'), mpv.get('container-fps').catch(() => null)]);
+      if (height) quality = `${height}p${fps >= 49 ? Math.round(fps) : ''}`;
+    } catch { /* audio-only or not known yet */ }
+    this.card = { until: Date.now() + POPUP_MS, quality };
+    this.#prepareThumbnail();
+    this.render();
+  }
+
+  async #prepareThumbnail() {
+    const url = this.playback.source?.thumbnail;
+    this.thumb.want = null;
+    if (!url) return;
+    try {
+      // Bitmaps are placed in real screen pixels, so scale the 1080p layout.
+      const osdH = (await this.mpv.get('osd-height')) || screens.H;
+      const s = osdH / screens.H;
+      const box = screens.cardLayout(true).thumb;
+      const w = Math.round(box.w * s);
+      const h = Math.round(box.h * s);
+      const file = await thumbnailBgra(url, w, h);
+      if (this.playback.source?.thumbnail !== url) return;
+      this.thumb.want = { file, x: Math.round(box.x * s), y: Math.round(box.y * s), w, h };
+      this.render();
+    } catch (e) {
+      this.log.debug('thumbnail failed:', e.message);
+    }
+  }
+
+  /** Schedules a redraw; several changes in a row collapse into one. */
+  render() {
+    if (this.scheduled) return;
+    this.scheduled = true;
+    setTimeout(() => {
+      this.scheduled = false;
+      this.#draw().catch((e) => this.log.debug('TV draw failed:', e.message));
+    }, 30);
+  }
+
+  async #draw() {
+    const now = Date.now();
+    const s = this.settings.get();
+    const t = themeFor(s);
+    const screen = this.screen();
+    const status = this.playback.status();
+    const onHome = screen === 'home' || screen === 'loading';
+    if (screen !== 'home') this.panel.open = false;
+
+    const fade = (until) => (until > now ? Math.min(1, (until - now) / FADE_MS) : 0);
+    if (this.sender && this.sender.until <= now) this.sender = null;
+    // mpv's property updates can trail file-loaded, so only drop the card once
+    // it's clearly gone (paused, or back home).
+    if (this.card && (this.card.until <= now || screen === 'paused' || screen === 'home')) this.card = null;
+    if (this.message && this.message.until <= now) this.message = null;
+
+    const layers = { bg: null, home: null, popup: null, pause: null, panel: null, toast: null };
+    if (onHome) {
+      layers.bg = screens.background(t);
+      const sender = status.owner === 'cast' ? this.cast.senders()[0] : null;
+      layers.home = screens.home(t, {
+        now: new Date(now),
+        clock24: s.clock24,
+        net: this.net,
+        pairingCode: this.cast.pairingCode,
+        remote: this.remote,
+        deviceName: s.deviceName,
+        loading: screen === 'loading' ? { ...status, sender } : null,
+        panelOpen: this.panel.open,
+      });
+    }
+    const popup = [];
+    if (this.card) {
+      popup.push(...screens.nowPlaying(t, {
+        ...status, quality: this.card.quality, withThumb: !!status.thumbnail,
+      }, fade(this.card.until)));
+    }
+    if (this.sender) popup.push(...screens.senderPill(t, this.sender.name, fade(this.sender.until)));
+    if (popup.length) layers.popup = popup;
+    if (screen === 'paused') layers.pause = screens.paused(t, status);
+    if (this.panel.open) {
+      const ids = Object.keys(ACCENTS);
+      if (s.accent === 'custom') ids.push('custom');
+      layers.panel = screens.settingsPanel(t, {
+        settings: s,
+        focus: this.panel.focus,
+        swatches: ids.map((id) => ({
+          id, hex: id === 'custom' ? s.customAccent : ACCENTS[id].hex, selected: id === s.accent,
+        })),
+      });
+    }
+    if (this.message) layers.toast = screens.toast(t, this.message.text);
+
+    for (const [name, events] of Object.entries(layers)) {
+      await this.#send(name, events ? events.join('\n') : null);
+    }
+
+    // Thumbnail: only while the card is fully visible (bitmaps can't fade).
+    const thumb = this.card && fade(this.card.until) >= 1 ? this.thumb.want : null;
+    await this.#showThumbnail(thumb);
+
+    // Wake up again for fades and expiries.
+    const deadlines = [this.card?.until, this.sender?.until, this.message?.until].filter(Boolean);
+    clearTimeout(this.timer);
+    if (deadlines.length) {
+      const next = Math.min(...deadlines);
+      const wait = next - now > FADE_MS ? next - now - FADE_MS : 120;
+      this.timer = setTimeout(() => this.render(), wait);
+    }
+  }
+
+  async #send(name, data) {
+    if (this.sent[name] === data) return;
+    const { id, z } = LAYERS[name];
+    try {
+      if (data === null) await this.mpv.clearOverlay({ id });
+      else await this.mpv.showOverlay(data, { id, z });
+      this.sent[name] = data;
+    } catch {
+      delete this.sent[name]; // retried on the next draw
+    }
+  }
+
+  async #showThumbnail(want) {
+    const shown = this.thumb.shown;
+    if (shown?.file === want?.file && shown?.x === want?.x) return;
+    try {
+      if (want) {
+        await this.mpv.command('overlay-add', THUMB_OVERLAY, want.x, want.y, want.file, 0, 'bgra', want.w, want.h, want.w * 4);
+      } else {
+        await this.mpv.command('overlay-remove', THUMB_OVERLAY);
+      }
+      this.thumb.shown = want;
+    } catch (e) {
+      this.log.debug('thumbnail overlay failed:', e.message);
+    }
+  }
+
+  #tickClock() {
+    const now = new Date();
+    const wait = (60 - now.getSeconds()) * 1000 - now.getMilliseconds() + 50;
+    setTimeout(() => {
+      if (this.screen() === 'home') this.render();
+      this.#tickClock();
+    }, wait);
+  }
+
+  async #pollNetwork() {
+    try {
+      const net = await networkStatus();
+      if (JSON.stringify(net) !== JSON.stringify(this.net)) {
+        this.net = net;
+        this.render();
+      }
+    } catch { /* keep the last known state */ }
+    setTimeout(() => this.#pollNetwork(), this.screen() === 'home' ? 30000 : 120000);
+  }
+}

@@ -8,7 +8,7 @@ const ICON_SIZES = [180, 192, 512];
 
 /** Web app + JSON API. Live state goes out over SSE at /api/events. */
 export default function createWebServer({
-  playback, controls, settings, recent, events, getStatus, getTheme, log,
+  playback, controls, settings, recent, events, tv, getStatus, getTheme, log,
 }) {
   const app = express();
   app.disable('x-powered-by');
@@ -65,6 +65,9 @@ export default function createWebServer({
   }));
 
   app.post('/api/volume', action((body) => controls.setVolume(body)));
+
+  // Same keys as the TV remote; handy for testing without HDMI-CEC.
+  app.post('/api/tv/key', action(({ key }) => ({ ok: true, handled: tv.key(String(key)) })));
 
   // Icons follow the current accent and style.
   const sendIcon = (size) => async (req, res) => {
