@@ -66,7 +66,7 @@ const STRINGS = {
     recent: 'Recent',
     recentEmpty: 'Things you play show up here.',
     deviceOffline: '{name} · offline',
-    cantReach: "Can't reach Pi-Cast",
+    cantReach: "Can't reach pi-cast",
     back: 'Back',
     accentColor: 'Accent color',
     customColor: 'Custom color',
@@ -85,7 +85,7 @@ const STRINGS = {
     cecSwitchInput: 'Switch TV input on cast',
     pairing: 'Pairing',
     tvCodeRow: 'TV code',
-    pairingHint: "If Pi-Cast doesn't show up under Cast: in the YouTube app, open Settings → Watch on TV → Enter TV code.",
+    pairingHint: "If pi-cast doesn't show up under Cast: in the YouTube app, open Settings → Watch on TV → Enter TV code.",
   },
   de: {
     readyToCast: 'Bereit zum Streamen',
@@ -141,7 +141,7 @@ const STRINGS = {
     recent: 'Zuletzt',
     recentEmpty: 'Was du abspielst, erscheint hier.',
     deviceOffline: '{name} · offline',
-    cantReach: 'Pi-Cast ist nicht erreichbar',
+    cantReach: 'pi-cast ist nicht erreichbar',
     back: 'Zurück',
     accentColor: 'Akzentfarbe',
     customColor: 'Eigene Farbe',
@@ -160,7 +160,7 @@ const STRINGS = {
     cecSwitchInput: 'Beim Streamen TV-Eingang wechseln',
     pairing: 'Kopplung',
     tvCodeRow: 'TV-Code',
-    pairingHint: 'Wenn Pi-Cast beim Streamen nicht auftaucht: in der YouTube-App Einstellungen → Auf Fernseher ansehen → TV-Code eingeben.',
+    pairingHint: 'Wenn pi-cast beim Streamen nicht auftaucht: in der YouTube-App Einstellungen → Auf Fernseher ansehen → TV-Code eingeben.',
   },
 };
 

@@ -14,7 +14,7 @@ function venvBin(name) {
 
 const defaults = {
   // Name shown in the YouTube app's cast menu until changed in settings.
-  deviceName: 'Pi-Cast',
+  deviceName: 'pi-cast',
   webPort: 8080,
   dialPort: 3000,
 

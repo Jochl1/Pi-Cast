@@ -21,7 +21,7 @@ export default class Cast extends EventEmitter {
   async start(name) {
     const player = new CastPlayer(this.playback, this.mpv, this.log);
     const receiver = new YouTubeCastReceiver(player, {
-      device: { name, screenName: name, brand: 'Pi-Cast', model: 'Raspberry Pi' },
+      device: { name, screenName: name, brand: 'pi-cast', model: 'Raspberry Pi' },
       dial: { port: this.dialPort },
       dataStore: this.dataStore,
       logLevel: this.logLevel,

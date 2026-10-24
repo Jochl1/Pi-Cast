@@ -89,7 +89,7 @@ export default function createWebServer({
     const theme = getTheme();
     res.type('application/manifest+json').send({
       name: settings.get().deviceName,
-      short_name: 'Pi-Cast',
+      short_name: 'pi-cast',
       start_url: '/',
       display: 'standalone',
       background_color: theme.phone,

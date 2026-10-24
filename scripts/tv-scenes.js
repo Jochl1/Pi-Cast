@@ -15,7 +15,7 @@ const de = { ...base, language: 'de' };
 const now = new Date(2026, 9, 24, 21, 34);
 const homeState = {
   now, clock24: true, net: { kind: 'wifi', ssid: 'Home', signal: 70 },
-  pairingCode: '123 456 789 012', remote: 'picast.local:8080', deviceName: 'Pi-Cast',
+  pairingCode: '123 456 789 012', remote: 'picast.local:8080', deviceName: 'pi-cast',
   qr: qrModules('http://picast.local:8080'),
 };
 const video = {

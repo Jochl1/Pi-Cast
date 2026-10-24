@@ -119,17 +119,17 @@ function bottomBar(t, { pairingCode, remote, qr }) {
     value(pairingCode ?? '—', PAD_X),
     label(t.tr('remote'), remoteX),
     value(remote, remoteX),
-    text(wordmark(t, t.muted), { x: W - PAD_X, y: 996, an: 3, px: 39, weight: 600, color: t.muted }),
+    text(wordmark(t, t.muted), { x: W - PAD_X, y: 1012, an: 3, px: 60, weight: 600, spacing: -1.2, color: t.muted }),
   ];
   if (qr) {
     // Next to the remote's address, with a short caption to its right.
-    const x = remoteX + textWidth(remote, 45, 0.6) + 84;
+    const x = remoteX + textWidth(remote, 45, 0.6) + 60;
     const tile = qrTile(t, qr, x, lineY + 24);
     const mid = lineY + 24 + tile.size / 2;
     events.push(
       ...tile.events,
-      text(t.tr('scanLine1'), { x: x + tile.size + 30, y: mid - 4, an: 1, px: 30, color: t.muted }),
-      text(t.tr('scanLine2'), { x: x + tile.size + 30, y: mid + 4, an: 7, px: 30, color: t.muted }),
+      text(t.tr('scanLine1'), { x: x + tile.size + 24, y: mid - 4, an: 1, px: 30, color: t.muted }),
+      text(t.tr('scanLine2'), { x: x + tile.size + 24, y: mid + 4, an: 7, px: 30, color: t.muted }),
     );
   }
   return events;

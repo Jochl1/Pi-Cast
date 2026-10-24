@@ -15,7 +15,7 @@ const SCHEMA = {
   sponsorBlock: { def: true, ok: bool },
   clock24: { def: true, ok: bool },
   language: { def: 'en', ok: (v) => v in LANGUAGES },
-  deviceName: { def: 'Pi-Cast', ok: (v) => typeof v === 'string' && v.trim().length > 0 && v.length <= 40 },
+  deviceName: { def: 'pi-cast', ok: (v) => typeof v === 'string' && v.trim().length > 0 && v.length <= 40 },
   twitchQuality: { def: '720p60', ok: (v) => TWITCH_QUALITIES.includes(v) },
   cecEnabled: { def: true, ok: bool },
   cecSwitchInput: { def: true, ok: bool },

@@ -100,7 +100,7 @@ function fmtTime(sec) {
 }
 
 function renderPill() {
-  const name = state.settings?.deviceName ?? state.status?.deviceName ?? 'Pi-Cast';
+  const name = state.settings?.deviceName ?? state.status?.deviceName ?? 'pi-cast';
   $('tv-name').textContent = state.connected ? name : tr('deviceOffline', { name });
 }
 
