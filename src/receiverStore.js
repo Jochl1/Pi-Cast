@@ -16,22 +16,32 @@ export default class ReceiverStore extends DataStore {
     } catch {
       this.data = {};
     }
+    this.queue = Promise.resolve();
   }
 
   async get(key) {
     return this.data[key] ?? null;
   }
 
-  async set(key, value) {
+  set(key, value) {
     this.data[key] = value;
-    fs.mkdirSync(path.dirname(this.file), { recursive: true });
-    const tmp = `${this.file}.tmp`;
-    await fs.promises.writeFile(tmp, JSON.stringify(this.data, null, 2));
-    await fs.promises.rename(tmp, this.file);
+    return this.#write(async () => {
+      fs.mkdirSync(path.dirname(this.file), { recursive: true });
+      const tmp = `${this.file}.tmp`;
+      await fs.promises.writeFile(tmp, JSON.stringify(this.data, null, 2));
+      await fs.promises.rename(tmp, this.file);
+    });
   }
 
-  async clear() {
+  clear() {
     this.data = {};
-    await fs.promises.rm(this.file, { force: true });
+    return this.#write(() => fs.promises.rm(this.file, { force: true }));
+  }
+
+  /** Runs file writes one at a time: overlapping ones would share the .tmp file. */
+  #write(job) {
+    const run = this.queue.then(job);
+    this.queue = run.catch(() => {});
+    return run;
   }
 }
