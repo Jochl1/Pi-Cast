@@ -261,3 +261,6 @@ The Pi 3 throttles from 1200 to 600 MHz on undervoltage (`vcgencmd get_throttled
 
 - **Instagram on the TV:** Reels/feed scrolled with the remote's arrow keys, a like button (OK), and login by scanning a QR code on the TV with the phone.
 - **Party games with the phone as controller:** Pong, Connect 4, tic-tac-toe and other simple games. The TV shows the game; phones join through the web app (QR code) and send input over the same HTTP/SSE channel.
+- **Spotify:** pi-cast as a Spotify Connect speaker (librespot, e.g. via raspotify; needs Premium), with the cover, title and progress on the TV. librespot needs the HDMI audio device, which mpv and the sounds helper also want (§4.5). It could hand its audio to mpv through a pipe, or take the device the way the sounds helper does.
+- **Colour key legend:** show what the four colour keys do, e.g. a small row of coloured dots with the favourites' names on the home screen (and in the settings panel). For Twitch favourites it could show who's live right now.
+- **Profiles:** a "Who's watching?" picker at startup, like Netflix, chosen with the arrow keys. Each profile has its own colour keys, accent, Recent list, language and, later, Instagram account.
