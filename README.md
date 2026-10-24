@@ -86,15 +86,13 @@ Settings from the web app are stored in `data/settings.json`. Lower-level option
 
 ```json
 {
-  "mpvHwdec": "drm",
-  "mpvAudioDevice": "alsa/hdmi:CARD=vc4hdmi,DEV=0",
   "logLevel": "debug"
 }
 ```
 
 | Option | Default | What it does |
 |---|---|---|
-| `mpvHwdec` | `v4l2m2m-copy` | Hardware decoder. Try `drm` (zero-copy, less CPU) if it plays smoothly. |
+| `mpvHwdec` | `v4l2m2m,v4l2m2m-copy` | Hardware decoder: zero-copy `v4l2m2m`, falling back to `v4l2m2m-copy` (much slower at 1080p). `drm` doesn't work on a Pi 3. |
 | `mpvAudioDevice` | `alsa/hdmi:CARD=vc4hdmi,DEV=0` | ALSA device for HDMI audio. List them with `mpv --audio-device=help`. |
 | `webPort` | `8080` | Port of the web app. |
 | `dialPort` | `3000` | Port for YouTube cast discovery. |
@@ -103,11 +101,13 @@ Settings from the web app are stored in `data/settings.json`. Lower-level option
 
 ## Troubleshooting
 
-- **Installer stops with "undervoltage":** the power supply is too weak, and writing to the SD card on low voltage corrupts it. Use a 5 V / 2.5 A supply with a short cable. `PICAST_IGNORE_POWER=1 ./deploy/install.sh` skips the check.
+- **Power supply:** use the official Raspberry Pi 5.1 V / 2.5 A supply. Weaker ones cause undervoltage, which halves the CPU speed (slow video starts) and corrupts SD card writes. `vcgencmd get_throttled` should print `throttled=0x0`; anything else means the Pi has been short on power since boot.
+- **Installer stops with "undervoltage":** see above. `PICAST_IGNORE_POWER=1 ./deploy/install.sh` skips the check.
+- **Videos take a while to start:** 30–60 s from tapping Cast is normal for now on a Pi 3 (yt-dlp is slow on it, slower still on low power). This is being worked on.
 - **Pi doesn't boot, green LED blinks 7 times:** the kernel on the SD card is damaged. The installer checks this before you reboot. If it happens anyway, the SD card is usually faulty.
 - **TV black but showing a signal:** turn the TV off and on once.
 - **Logs:** `journalctl -u picast -f`. Use `"logLevel": "debug"` for mpv/streamlink/CEC details.
-- **Stuttering video:** check the CPU with `htop` while a video plays. With `v4l2m2m-copy` or `drm`, mpv should stay well under 100 %. If it's high, hardware decoding isn't working. Try the other `mpvHwdec` value. Videos are capped at 1080p30 H.264. 1080p60 is too much for a Pi 3.
+- **Stuttering video:** check the CPU with `htop` while a video plays. With zero-copy decoding, mpv sits around 20 % at 1080p. If it's near 100 % or more, mpv fell back to `v4l2m2m-copy` or software decoding. Check `journalctl -u picast` for mpv errors, and check the power supply. Videos are capped at 1080p30 H.264. 1080p60 is too much for a Pi 3.
 - **YouTube stopped working:** update yt-dlp now instead of waiting for the daily timer: `sudo systemctl start picast-update`.
 - **No sound:** check `mpvAudioDevice` against `mpv --audio-device=help`.
 - **TV remote does nothing:** `cec-client -l` should list an adapter. Stop Pi-Cast (`sudo systemctl stop picast`) and run `cec-client -t p -d 8`, then press keys: lines with `>> 04:44:xx` mean the TV sends them. `cec-ctl -d /dev/cec0 --playback && cec-ctl -d /dev/cec0 --monitor` is another view.
@@ -116,6 +116,8 @@ Settings from the web app are stored in `data/settings.json`. Lower-level option
 
 ## Development
 
-No build step. `npm run check` syntax-checks all JavaScript. `npm start` runs the server; without mpv it keeps retrying in the background, so the web app and API can be tried on any machine. `node scripts/preview-tv.js <dir> <ffmpeg>` renders every TV screen to PNG, using an ffmpeg build that has libass.
+No build step. `npm run check` syntax-checks all JavaScript. `npm start` runs the server; without mpv it keeps retrying in the background, so the web app and API can be tried on any machine. `node scripts/preview-tv.js <dir> <ffmpeg>` renders every TV screen to PNG, using an ffmpeg build that has libass. On the Pi, `sudo systemctl stop picast && node scripts/check-osd.js` draws every TV screen in a real mpv and fails if they don't fit the Pi 3's overlay limit; run it after any change to the TV screens.
+
+How it's built, the design, and the hardware limits behind the decisions: [docs/DESIGN.md](docs/DESIGN.md).
 
 Layout: `src/` is the server (`index.js` wires everything together, `tv/` draws the TV screens, `cast.js` is the YouTube receiver, `cec.js` handles the TV remote), `public/` is the web app, `deploy/` has the installer, mpv config and boot splash, and `assets/fonts/` holds Sora and JetBrains Mono (SIL Open Font License).
