@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "express": "^4.21.2",
+    "qrcode": "^1.5.4",
     "yt-cast-receiver": "^2.1.0"
   }
 }

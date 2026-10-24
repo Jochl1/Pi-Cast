@@ -47,7 +47,7 @@ There are 10 presets plus a custom colour: Violet `#A898FF` (default), Sky `#6FA
 ### Screens
 
 1. **Boot splash (Plymouth):** the wordmark centred, three dots below it (the middle one in the accent), "STARTING UP" at the bottom, and the two glows drifting slowly on 14–18 s loops. The "Animated boot" setting freezes them.
-2. **Home:** the backdrop above, a large clock (24h/12h) and the date at the top left, Wi-Fi status at the top right, "Ready to cast" with a one-line hint in the centre, and a bottom bar with the TV code (pairing code), the remote address and a small wordmark.
+2. **Home:** the backdrop above, a large clock (24h/12h) and the date at the top left, Wi-Fi status at the top right, "Ready to cast" with a one-line hint in the centre, and a bottom bar with the TV code (pairing code), the remote address, a QR code for it ("Scan with your phone camera") and a small wordmark.
 3. **Loading:** shown while a new item starts, with the title and the sender when they're known.
 4. **Now-playing pop-ups** that fade after about 5 s: a "<sender> connected" pill at the top right; a card at the bottom left with the thumbnail, "NOW PLAYING" in the accent, the title, and the source and quality; and a thin accent progress line.
 5. **Paused:** dimmed video, a pause icon in an accent ring, and at the bottom the title, channel and source, an accent progress bar, and the elapsed and total times in mono.
@@ -57,7 +57,7 @@ There are 10 presets plus a custom colour: Violet `#A898FF` (default), Sky `#6FA
 
 ## 3. Architecture
 
-Node 22 (ESM), with `express` and `yt-cast-receiver` as the only dependencies and no build step. One mpv process draws everything on the TV.
+Node 22 (ESM), with `express`, `yt-cast-receiver` and `qrcode` as the only dependencies and no build step. One mpv process draws everything on the TV.
 
 ### Modules (`src/`)
 
@@ -138,6 +138,7 @@ streamlink with `--player-external-http` on `127.0.0.1`; Pi-Cast waits for its U
   - The animated version is a looping H.264 clip (1080p, 10 fps, 30 s, CRF 10 with `-tune grain`, about 48 MB). Painting 300 frames takes far too long on a Pi 3 and its hardware encoder bands, so `scripts/render-backdrops.js` renders one per accent preset **on a PC**; they're copied to the Pi's `data/backdrops/` (not in git). A custom accent, or a missing clip, falls back to the still image. Plays hardware-decoded at about 9% CPU.
   - mpv's `background-color` (the style's background on home and loading, black during playback) is the fallback while the image is painted.
 - Redraws only happen when something visible changes: the clock once a minute, the progress once a second, and only while the pause screen or a card is showing. Nothing is drawn while mpv is disconnected, and failed overlay commands are logged.
+- The QR code for the web remote (`http://<hostname>.local:<port>`) is one ASS shape: each row's runs of dark modules are one rectangle, on whole pixels, on a light rounded tile. It can't be part of the backdrop, because the loop clips are rendered on a PC.
 - Dimming (pause screen, settings panel) is an ASS rectangle, because mpv's video equalizer doesn't apply in overlay mode (§4.1).
 - `scripts/tv-scenes.js` holds the sample screens. `scripts/preview-tv.js` renders them to PNG with any libass ffmpeg; `scripts/check-osd.js` draws them in a real mpv on the Pi and fails on OSD errors.
 

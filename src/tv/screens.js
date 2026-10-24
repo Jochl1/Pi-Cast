@@ -1,5 +1,5 @@
 import {
-  text, span, rect, circle, arcBand, escape, fit, textWidth,
+  text, span, rect, circle, arcBand, escape, fit, textWidth, qrShape,
 } from './ass.js';
 
 /**
@@ -82,14 +82,28 @@ function network(t, net) {
   ];
 }
 
-function bottomBar(t, { pairingCode, remote }) {
+/** QR code tile (dark modules on a light rounded square), top left at (x, y). */
+export function qrTile(t, qr, x, y) {
+  const cell = 6;
+  const quiet = 2; // modules of light margin; less than the spec's 4, but phones cope
+  const size = (qr.length + 2 * quiet) * cell;
+  return {
+    size,
+    events: [
+      rect(x, y, size, size, { color: t.text, radius: t.small * 1.5 }),
+      qrShape(qr, x + quiet * cell, y + quiet * cell, cell, { color: t.bg }),
+    ],
+  };
+}
+
+function bottomBar(t, { pairingCode, remote, qr }) {
   const lineY = 846;
   const labelY = 888;
   const valueY = 924;
   const remoteX = PAD_X + Math.max(textWidth('000 000 000 000', 45, 0.6), textWidth(pairingCode ?? '', 45, 0.6)) + 96;
   const label = (s, x) => text(s, { x, y: labelY, px: 30, weight: 600, spacing: 3.6, color: t.muted });
   const value = (s, x) => text(escape(s), { x, y: valueY, px: 45, font: 'JetBrains Mono', weight: 500, color: t.text });
-  return [
+  const events = [
     rect(PAD_X, lineY, W - 2 * PAD_X, 3, { color: t.line }),
     label('TV CODE', PAD_X),
     value(pairingCode ?? '—', PAD_X),
@@ -97,13 +111,25 @@ function bottomBar(t, { pairingCode, remote }) {
     value(remote, remoteX),
     text(wordmark(t, t.muted), { x: W - PAD_X, y: 996, an: 3, px: 39, weight: 600, color: t.muted }),
   ];
+  if (qr) {
+    // Next to the remote's address, with a short caption to its right.
+    const x = remoteX + textWidth(remote, 45, 0.6) + 84;
+    const tile = qrTile(t, qr, x, lineY + 24);
+    const mid = lineY + 24 + tile.size / 2;
+    events.push(
+      ...tile.events,
+      text('Scan with your', { x: x + tile.size + 30, y: mid - 4, an: 1, px: 30, color: t.muted }),
+      text('phone camera', { x: x + tile.size + 30, y: mid + 4, an: 7, px: 30, color: t.muted }),
+    );
+  }
+  return events;
 }
 
 /** Home / idle screen. `loading` = { title, channel, kind, sender } while a video starts. */
-export function home(t, { now, clock24, net, pairingCode, remote, deviceName, loading, panelOpen }) {
+export function home(t, { now, clock24, net, pairingCode, remote, qr, deviceName, loading, panelOpen }) {
   if (panelOpen) return clock(t, now, clock24, 0.35);
 
-  const events = [...clock(t, now, clock24), ...network(t, net), ...bottomBar(t, { pairingCode, remote })];
+  const events = [...clock(t, now, clock24), ...network(t, net), ...bottomBar(t, { pairingCode, remote, qr })];
   if (loading) {
     const sub = [loading.channel, SOURCE[loading.kind], loading.sender && `from ${loading.sender}`].filter(Boolean).join(' · ');
     events.push(

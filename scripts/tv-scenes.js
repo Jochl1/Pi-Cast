@@ -2,14 +2,20 @@
 // (fit test on the Pi). Each scene's layers are lists of ASS events, in the
 // same stacking order the app uses. Scenes without `video` sit on the
 // background color, which mpv draws itself (the app shows a backdrop image there).
+import QRCode from 'qrcode';
 import { ACCENTS } from '../src/shared/theme.js';
 import * as screens from '../src/tv/screens.js';
 
 const base = { accent: 'violet', customAccent: '#A898FF', clock24: true, bootAnimation: true, sponsorBlock: true, cecSwitchInput: true };
+function qrModules(url) {
+  const { modules } = QRCode.create(url, { errorCorrectionLevel: 'M' });
+  return Array.from({ length: modules.size }, (_, r) => Array.from({ length: modules.size }, (_, c) => !!modules.get(r, c)));
+}
 const now = new Date(2026, 9, 24, 21, 34);
 const homeState = {
   now, clock24: true, net: { kind: 'wifi', ssid: 'Home', signal: 70 },
   pairingCode: '123 456 789 012', remote: 'picast.local:8080', deviceName: 'Pi-Cast',
+  qr: qrModules('http://picast.local:8080'),
 };
 const video = {
   title: 'Building a tiny cast receiver out of a Raspberry Pi', channel: 'Some Channel', kind: 'youtube',

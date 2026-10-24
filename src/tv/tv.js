@@ -1,3 +1,4 @@
+import QRCode from 'qrcode';
 import { ACCENTS, themeFor } from '../shared/theme.js';
 import { networkStatus } from '../network.js';
 import { thumbnailBgra } from './thumbnail.js';
@@ -36,6 +37,9 @@ export default class Tv {
     this.timer = null;
     this.scheduled = false;
     this.backdropKey = null;
+    // The web remote's address as a QR code on the home screen.
+    const { modules } = QRCode.create(`http://${remote}`, { errorCorrectionLevel: 'M' });
+    this.qr = Array.from({ length: modules.size }, (_, r) => Array.from({ length: modules.size }, (_, c) => !!modules.get(r, c)));
   }
 
   start() {
@@ -216,6 +220,7 @@ export default class Tv {
         net: this.net,
         pairingCode: this.cast.pairingCode,
         remote: this.remote,
+        qr: this.qr,
         deviceName: s.deviceName,
         loading: screen === 'loading' ? { ...status, sender } : null,
         panelOpen: this.panel.open,

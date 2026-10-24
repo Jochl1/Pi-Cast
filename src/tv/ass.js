@@ -98,6 +98,26 @@ export function shape(path, {
 export const rect = (x, y, w, h, opts = {}) => shape(roundedRectPath(w, h, opts.radius ?? 0), { ...opts, x, y });
 export const circle = (cx, cy, radius, opts = {}) => shape(circlePath(radius), { ...opts, x: cx - radius, y: cy - radius });
 
+/**
+ * A QR code as one shape event: `modules` is a size x size grid (true = dark),
+ * drawn at (x, y) with `cell` px per module. Runs of dark modules in a row
+ * become one rectangle each, and whole-pixel cells keep the edges sharp.
+ */
+export function qrShape(modules, x, y, cell, opts = {}) {
+  const parts = [];
+  modules.forEach((row, r) => {
+    for (let c = 0; c < row.length;) {
+      if (!row[c]) { c++; continue; }
+      let end = c;
+      while (end < row.length && row[end]) end++;
+      const [x0, x1, y0, y1] = [c * cell, end * cell, r * cell, (r + 1) * cell];
+      parts.push(`m ${x0} ${y0} l ${x1} ${y0} ${x1} ${y1} ${x0} ${y1}`);
+      c = end;
+    }
+  });
+  return shape(parts.join(' '), { ...opts, x: Math.round(x), y: Math.round(y) });
+}
+
 /** Polygon from absolute points; normalised to local coordinates. */
 export function polygon(points, opts = {}) {
   const minX = Math.min(...points.map((p) => p[0]));
