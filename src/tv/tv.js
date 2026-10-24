@@ -1,5 +1,5 @@
 import QRCode from 'qrcode';
-import { ACCENTS } from '../shared/theme.js';
+import { ACCENTS, KEY_COLORS } from '../shared/theme.js';
 import { LANGUAGES } from '../shared/i18n.js';
 import { networkStatus } from '../network.js';
 import { thumbnailBgra } from './thumbnail.js';
@@ -37,10 +37,10 @@ const PULSE_MS = 700;
  */
 export default class Tv {
   constructor({
-    mpv, playback, cast, settings, sounds, reels, log, remote,
+    mpv, playback, cast, settings, sounds, reels, weather, instagram, log, remote,
   }) {
     Object.assign(this, {
-      mpv, playback, cast, settings, sounds, reels, log, remote,
+      mpv, playback, cast, settings, sounds, reels, weather, instagram, log, remote,
     });
     this.sent = {};
     this.panel = { open: false, focus: 0 };
@@ -86,6 +86,9 @@ export default class Tv {
     });
     cast.on('change', () => this.render());
     this.reels.on('change', () => this.render());
+    this.weather.on('change', () => this.render());
+    // The ▲ Instagram hint shows while logged in.
+    this.instagram.on('change', () => this.render());
     settings.on('change', () => {
       this.#updateBackdrop();
       this.render();
@@ -263,11 +266,13 @@ export default class Tv {
         clock24: s.clock24,
         net: this.net,
         pairingCode: this.cast.pairingCode,
-        remote: this.remote,
         qr: this.qr,
         deviceName: s.deviceName,
         loading: screen === 'loading' ? { ...status, sender } : null,
         panelOpen: this.panel.open,
+        weather: this.weather.data,
+        keys: Object.entries(KEY_COLORS).filter(([color]) => s.shortcuts[color]).map(([color, hex]) => ({ hex, name: s.shortcuts[color].name })),
+        instagram: !!this.instagram.state.user,
       });
     }
     const popup = [];

@@ -48,7 +48,10 @@ There are 10 presets plus a custom colour: Violet `#A898FF` (default), Sky `#6FA
 ### Screens
 
 1. **Boot splash (Plymouth):** the wordmark centred, three dots below it (the middle one in the accent), "STARTING UP" at the bottom, and the two glows drifting slowly on 14–18 s loops. The "Animated boot" setting freezes them.
-2. **Home:** the backdrop above, a large clock (24h/12h) and the date at the top left, Wi-Fi status at the top right, "Ready to cast" with a one-line hint in the centre, and a bottom bar with the TV code (pairing code), the remote address, a QR code for it ("Scan with your phone camera") and a small wordmark.
+2. **Home:** the backdrop above, a large clock (24h/12h) and the date at the top left, and "Ready to cast" with a one-line hint in the centre.
+   - **Weather** at the top right, opposite the clock (when a place is set): the icon and temperature, the condition with today's high/low, and the next three days in columns (day, icon, high and muted low). It ends well above the glass card. The icons are ASS shapes (`tv/weatherIcons.js`): sun and moon in the accent, clouds in the text colour.
+   - **Key hints** above a thin divider: the colour keys' favourites as coloured dots with names on the left, and "▲ Instagram" on the right while logged in.
+   - **Below the divider:** the web remote's QR code (no caption), the TV code (pairing code) and the network (WLAN + network name with the Wi-Fi icon) on the left, and a large wordmark on the right. The user dropped the remote's address and the "Scan with your phone camera" text for a calmer look.
 3. **Loading:** shown while a new item starts. "LOADING" in the accent, the title, and channel · source · "from <sender>" in the glass card in the middle, with three dots below it that pulse one after another (the middle one in the accent).
    - From home it sits on the backdrop's card. When casting over a playing video, the old video freezes, dimmed, under a glass card of the same size.
    - The same card says "BUFFERING" when a video stalls for more than a second.
@@ -84,6 +87,7 @@ Node 22 (ESM), with `express`, `yt-cast-receiver` and `qrcode` as the only depen
 | `cec.js` | TV remote over `cec-client`. |
 | `boot.js`, `render.js`, `icons.js` | Boot splash images, SVG to PNG via `rsvg-convert` (cached by content), app icons. |
 | `tv/background.js` | Paints the home backdrop (PNG) and finds its loop clip. |
+| `weather.js` | Weather for the home screen from Open-Meteo (free, no key), refreshed every 30 min; place lookup by name. |
 | `network.js` | Wi-Fi status via `nmcli`. |
 | `sounds.js` | UI sounds and the startup sound, through `bin/sounds.py` (see below). |
 | `instagram.js` | Instagram worker (`bin/insta.py`) and the login state. |
@@ -205,6 +209,7 @@ streamlink with `--player-external-http` on `127.0.0.1`; Pi-Cast waits for its U
 | Twitch quality | Takes effect on the next stream. |
 | SponsorBlock | Restart mpv when idle. |
 | Clock | Redraw the home screen. |
+| Weather place | Fetch the weather for it (or hide it). Set in the web app by name, looked up with Open-Meteo's geocoder. |
 | Sounds | UI sounds and the startup sound on/off (checked when a sound would play). |
 | Language | Redraw the overlays, re-label the web app, regenerate the boot splash ("STARTING UP" / "WIRD GESTARTET"). |
 | CEC toggles | Start or stop CEC; switch the input on cast; standby with the TV (turning it off wakes up). |
@@ -280,9 +285,8 @@ The Pi 3 throttles from 1200 to 600 MHz on undervoltage (`vcgencmd get_throttled
 
 - **Party games with the phone as controller:** Pong, Connect 4, tic-tac-toe and other simple games. The TV shows the game; phones join through the web app (QR code) and send input over the same HTTP/SSE channel.
 - **Spotify:** pi-cast as a Spotify Connect speaker (librespot, e.g. via raspotify; needs Premium), with the cover, title and progress on the TV. librespot needs the HDMI audio device, which mpv and the sounds helper also want (§4.5). It could hand its audio to mpv through a pipe, or take the device the way the sounds helper does.
-- **Colour key legend:** show what the four colour keys do, e.g. a small row of coloured dots with the favourites' names on the home screen (and in the settings panel). For Twitch favourites it could show who's live right now.
+- **Colour key legend, more:** the home screen shows the favourites now; for Twitch favourites it could also show who's live right now.
 - **Profiles:** a "Who's watching?" picker at startup, like Netflix, chosen with the arrow keys. Each profile has its own colour keys, accent, Recent list, language and, later, Instagram account.
-- **Weather forecast on the home screen:** today's and the next days' weather next to the clock, from Open-Meteo (free, no key). The location could come from the web app's settings.
 - **AirPlay screen mirroring** from the iPhone, with UxPlay (open-source AirPlay server; GStreamer, hardware H.264 through v4l2). It's an experiment on a Pi 3:
   - **The display:** UxPlay draws through its own GStreamer sink and needs the display, which mpv holds. So mpv would have to step aside while mirroring (be stopped and started again afterwards, with a black flash), or UxPlay's H.264 would have to be fed to mpv.
   - **Audio:** it needs the HDMI audio device too (§4.5).

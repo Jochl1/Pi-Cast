@@ -16,8 +16,19 @@ const de = { ...base, language: 'de' };
 const now = new Date(2026, 9, 24, 21, 34);
 const homeState = {
   now, clock24: true, net: { kind: 'wifi', ssid: 'Home', signal: 70 },
-  pairingCode: '123 456 789 012', remote: 'picast.local:8080', deviceName: 'pi-cast',
+  pairingCode: '123 456 789 012', deviceName: 'pi-cast',
   qr: qrModules('http://picast.local:8080'),
+  weather: {
+    current: { temp: 13.6, code: 2, day: true },
+    days: [
+      { date: '2026-10-24', code: 2, max: 15.2, min: 8.1 },
+      { date: '2026-10-25', code: 61, max: 12.4, min: 7.9 },
+      { date: '2026-10-26', code: 3, max: 11.0, min: 6.2 },
+      { date: '2026-10-27', code: 0, max: 14.8, min: 5.5 },
+    ],
+  },
+  keys: [{ hex: '#FF5D5D', name: 'Trymacs' }, { hex: '#4BE3B0', name: 'BigSpin' }],
+  instagram: true,
 };
 const video = {
   title: 'Building a tiny cast receiver out of a Raspberry Pi', channel: 'Some Channel', kind: 'youtube',
@@ -63,6 +74,22 @@ export const scenes = {
   },
   toast: { settings: base, video: true, layers: (t) => [screens.toast(t, toastText)] },
   'key-toast': { settings: base, video: true, layers: (t) => [screens.toast(t, 'Trymacs', '#FF5D5D')] },
+  'home-night-icons': {
+    settings: { ...base, accent: 'cyan' },
+    layers: (t) => [screens.home(t, {
+      ...homeState,
+      weather: {
+        current: { temp: -2.4, code: 0, day: false },
+        days: [
+          { date: '2026-10-24', code: 0, max: 1, min: -4 },
+          { date: '2026-10-25', code: 73, max: 0, min: -3 },
+          { date: '2026-10-26', code: 95, max: 4, min: 1 },
+          { date: '2026-10-27', code: 45, max: 3, min: -1 },
+        ],
+      },
+      keys: [{ hex: '#FF5D5D', name: 'Trymacs' }, { hex: '#4BE3B0', name: 'BigSpin' }, { hex: '#FFD23F', name: 'Lofi Girl' }, { hex: '#4D7CFF', name: 'Kurzgesagt' }],
+    })],
+  },
   // German: the longest texts.
   'home-de': { settings: de, layers: (t) => [screens.home(t, homeState)] },
   'loading-de': {

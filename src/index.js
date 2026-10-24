@@ -7,6 +7,7 @@ import Streamlink from './streamlink.js';
 import Ytdl from './ytdl.js';
 import Instagram from './instagram.js';
 import Reels from './reels.js';
+import Weather, { findPlace } from './weather.js';
 import Playback from './playback.js';
 import Cast from './cast.js';
 import Settings, { streamlinkQuality } from './settings.js';
@@ -123,8 +124,10 @@ settings.on('change', (values, changed) => {
 // --- TV screens ---
 const sounds = new Sounds({ config, mpv, playback, settings, log });
 sounds.start();
+const weather = new Weather({ settings, log });
+weather.start();
 const tv = new Tv({
-  mpv, playback, cast, settings, sounds, reels, log,
+  mpv, playback, cast, settings, sounds, reels, weather, instagram, log,
   remote: `${os.hostname()}.local:${config.webPort}`,
 });
 tv.start();
@@ -210,7 +213,7 @@ instagram.start();
 await cast.start(settings.get().deviceName);
 
 const web = createWebServer({
-  playback, controls, settings, recent, events, remoteKey, instagram, getStatus, getTheme, log,
+  playback, controls, settings, recent, events, remoteKey, instagram, findPlace, getStatus, getTheme, log,
 });
 web.listen(config.webPort, () => {
   log.info(`Pi-Cast "${settings.get().deviceName}" ready — web app at http://${lanAddress()}:${config.webPort}`);

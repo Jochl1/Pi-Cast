@@ -8,7 +8,7 @@ const ICON_SIZES = [180, 192, 512];
 
 /** Web app + JSON API. Live state goes out over SSE at /api/events. */
 export default function createWebServer({
-  playback, controls, settings, recent, events, remoteKey, instagram, getStatus, getTheme, log,
+  playback, controls, settings, recent, events, remoteKey, instagram, findPlace, getStatus, getTheme, log,
 }) {
   const app = express();
   app.disable('x-powered-by');
@@ -80,6 +80,15 @@ export default function createWebServer({
   }));
   app.post('/api/instagram/code', action(({ code }) => instagram.code(typeof code === 'string' ? code : null)));
   app.post('/api/instagram/logout', action(() => instagram.logout()));
+
+  // Weather place: looked up by name; an empty name hides the weather.
+  app.post('/api/weather/place', action(async ({ query }) => {
+    const name = typeof query === 'string' ? query.trim() : '';
+    const place = name ? await findPlace(name.slice(0, 100), settings.get().language) : null;
+    if (name && !place) return { ok: false, notFound: true };
+    await settings.update({ weatherPlace: place });
+    return { ok: true, place };
+  }));
 
   // Icons follow the current accent.
   const sendIcon = (size) => async (req, res) => {

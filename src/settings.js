@@ -11,6 +11,10 @@ const shortcutsOk = (v) => isObject(v) && Object.entries(v).every(([color, s]) =
   isObject(s) && typeof s.name === 'string' && s.name.trim().length > 0 && s.name.length <= 30
   && typeof s.url === 'string' && /^https?:\/\/\S+$/i.test(s.url) && s.url.length <= 500)));
 
+/** null, or { name, lat, lon } from the geocoder (see weather.js). */
+const placeOk = (v) => v === null || (isObject(v) && typeof v.name === 'string' && v.name.length <= 80
+  && Number.isFinite(v.lat) && Math.abs(v.lat) <= 90 && Number.isFinite(v.lon) && Math.abs(v.lon) <= 180);
+
 // Each setting: default value and a validator for incoming values.
 const SCHEMA = {
   accent: { def: 'violet', ok: (v) => v === 'custom' || v in ACCENTS },
@@ -32,6 +36,8 @@ const SCHEMA = {
     },
     ok: shortcutsOk,
   },
+  // Where the home screen's weather is for; null hides it.
+  weatherPlace: { def: null, ok: placeOk },
   deviceName: { def: 'pi-cast', ok: (v) => typeof v === 'string' && v.trim().length > 0 && v.length <= 40 },
   twitchQuality: { def: '720p60', ok: (v) => TWITCH_QUALITIES.includes(v) },
   cecEnabled: { def: true, ok: bool },

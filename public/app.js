@@ -327,6 +327,18 @@ function buildSettings() {
     return row;
   }));
 
+  const place = $('weather-place');
+  place.addEventListener('change', async () => {
+    const query = place.value.trim();
+    if (query === (state.settings.weatherPlace?.name ?? '')) return;
+    try {
+      const res = await api('POST', '/api/weather/place', { query });
+      if (res.notFound) toast(tr('weatherNotFound'));
+    } catch { /* toast shown */ }
+    renderSettings();
+  });
+  place.addEventListener('keydown', (e) => { if (e.key === 'Enter') place.blur(); });
+
   const language = $('language');
   language.replaceChildren(...Object.entries(LANGUAGES).map(([id, l]) => new Option(l.label, id)));
   language.addEventListener('change', () => change({ language: language.value }));
@@ -379,6 +391,7 @@ function renderSettings() {
     sw.setAttribute('aria-pressed', String(!!s[sw.dataset.setting]));
   }
   if (document.activeElement !== $('device-name')) $('device-name').value = s.deviceName;
+  if (document.activeElement !== $('weather-place')) $('weather-place').value = s.weatherPlace?.name ?? '';
   $('twitch-quality').value = s.twitchQuality;
   $('twitch-quality-value').textContent = s.twitchQuality;
   for (const row of $('shortcuts').children) {

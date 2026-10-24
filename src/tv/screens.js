@@ -1,8 +1,9 @@
 import { themeFor } from '../shared/theme.js';
 import { LANGUAGES, translator } from '../shared/i18n.js';
 import {
-  text, span, rect, circle, shape, arcBand, escape, fit, textWidth, qrShape,
+  text, span, paint, rect, circle, shape, arcBand, escape, fit, textWidth, qrShape,
 } from './ass.js';
+import { weatherIcon, weatherKind } from './weatherIcons.js';
 
 /**
  * Pure layout functions: state in, ASS events out. Coordinates are 1920x1080
@@ -70,31 +71,25 @@ function wifiIcon(x, y, color, active, bars) {
   return events;
 }
 
+/** The network as a label and value with the Wi-Fi icon: Wi-Fi + network name, Ethernet or Offline. */
 function network(t, net) {
-  let label = t.tr('network');
+  let label = t.tr('wifi');
+  let value = net?.ssid ?? 'Wi-Fi';
   let bars = 3;
   let active = true;
   if (net?.kind === 'wifi') {
-    label = net.ssid ? `Wi-Fi · ${net.ssid}` : 'Wi-Fi';
     if (net.signal != null) bars = net.signal > 66 ? 3 : net.signal > 33 ? 2 : 1;
   } else if (net?.kind === 'wired') {
-    label = t.tr('ethernet');
-  } else if (net?.kind === 'offline') {
-    label = t.tr('offline');
-    active = false;
+    [label, value] = [t.tr('network'), t.tr('ethernet')];
+  } else {
+    [label, value] = [t.tr('network'), t.tr(net?.kind === 'offline' ? 'offline' : 'network')];
+    active = net?.kind !== 'offline';
   }
-  label = fit(label, 36, 600);
-  const right = W - PAD_X;
-  const iconX = right - textWidth(label, 36) - 18 - 48;
-  return [
-    ...wifiIcon(iconX, PAD_Y + 6, t.muted, active, bars),
-    text(escape(label), { x: right, y: PAD_Y, an: 9, px: 36, color: t.muted }),
-  ];
+  return { label, value: fit(value, 39, 420), icon: (x, y) => wifiIcon(x, y, t.text, active, bars) };
 }
 
 /** QR code tile (dark modules on a light rounded square), top left at (x, y). */
-export function qrTile(t, qr, x, y) {
-  const cell = 6;
+export function qrTile(t, qr, x, y, cell = 6) {
   const quiet = 2; // modules of light margin; less than the spec's 4, but phones cope
   const size = (qr.length + 2 * quiet) * cell;
   return {
@@ -106,40 +101,120 @@ export function qrTile(t, qr, x, y) {
   };
 }
 
-function bottomBar(t, { pairingCode, remote, qr }) {
-  const lineY = 846;
-  const labelY = 888;
-  const valueY = 924;
-  const remoteX = PAD_X + Math.max(textWidth('000 000 000 000', 45, 0.6), textWidth(pairingCode ?? '', 45, 0.6)) + 96;
-  const label = (s, x) => text(s, { x, y: labelY, px: 30, weight: 600, spacing: 3.6, color: t.muted });
-  const value = (s, x) => text(escape(s), { x, y: valueY, px: 45, font: 'JetBrains Mono', weight: 500, color: t.text });
-  const events = [
-    rect(PAD_X, lineY, W - 2 * PAD_X, 3, { color: t.line }),
-    label(t.tr('tvCode'), PAD_X),
-    value(pairingCode ?? '—', PAD_X),
-    label(t.tr('remote'), remoteX),
-    value(remote, remoteX),
-    text(wordmark(t, t.muted), { x: W - PAD_X, y: 1012, an: 3, px: 60, weight: 600, spacing: -1.2, color: t.muted }),
-  ];
+const BOTTOM_Y = H - PAD_Y; // baseline of the bottom row
+const LINE_Y = 806; // the divider above it
+
+/** A small spaced-out label over a value, at the bottom row's baseline; `icon(x, y)` goes before the value. */
+function infoBlock(t, x, label, value, { mono = false, icon = null } = {}) {
+  const events = [text(escape(label.toLocaleUpperCase(t.tr.locale)), {
+    x, y: BOTTOM_Y - 50, an: 1, px: 24, weight: 600, spacing: 3.6, color: t.muted,
+  })];
+  let vx = x;
+  if (icon) {
+    events.push(...icon(vx - 4, BOTTOM_Y - 48));
+    vx += 56;
+  }
+  events.push(text(escape(value), {
+    x: vx, y: BOTTOM_Y, an: 1, px: 39, font: mono ? 'JetBrains Mono' : 'Sora', weight: 500, color: t.text,
+  }));
+  return { events, w: vx - x + textWidth(value, 39, mono ? 0.6 : 0.55) };
+}
+
+/**
+ * Below the divider: the web remote's QR code, the TV code and the network
+ * on the left, the wordmark on the right.
+ */
+function bottomBar(t, { pairingCode, qr, net }) {
+  const events = [rect(PAD_X, LINE_Y, W - 2 * PAD_X, 3, { color: t.line })];
+  let x = PAD_X;
   if (qr) {
-    // Next to the remote's address, with a short caption to its right.
-    const x = remoteX + textWidth(remote, 45, 0.6) + 60;
-    const tile = qrTile(t, qr, x, lineY + 24);
-    const mid = lineY + 24 + tile.size / 2;
+    const cell = 5;
+    const size = (qr.length + 4) * cell;
+    events.push(...qrTile(t, qr, x, BOTTOM_Y + 6 - size, cell).events);
+    x += size + 40;
+  }
+  const code = infoBlock(t, x, t.tr('tvCode'), pairingCode ?? '—', { mono: true });
+  const n = network(t, net);
+  const netBlock = infoBlock(t, x + code.w + 96, n.label, n.value, { icon: n.icon });
+  events.push(
+    ...code.events,
+    ...netBlock.events,
+    text(wordmark(t, t.text), { x: W - PAD_X, y: BOTTOM_Y + 16, an: 3, px: 104, weight: 600, spacing: -2, color: t.text }),
+  );
+  return events;
+}
+
+const deg = (v) => `${Math.round(v)}°`.replace('-', '−');
+const weekday = (date, locale) => new Date(`${date}T12:00`).toLocaleDateString(locale, { weekday: 'short' }).replace('.', '');
+
+/**
+ * Weather at the top right, opposite the clock: icon and temperature, the
+ * condition with today's high and low, and the next three days in columns.
+ * It ends well above the backdrop's glass card (CARD.y).
+ * `weather` = { current: { temp, code, day }, days: [{ date, code, max, min }] }
+ * with today first.
+ */
+function weather(t, w) {
+  const right = W - PAD_X;
+  const colors = { accent: t.accent, text: t.text };
+  const temp = deg(w.current.temp);
+  const kind = weatherKind(w.current.code);
+  const events = [
+    text(temp, { x: right, y: PAD_Y - 36, an: 9, px: 112, weight: 600, spacing: -3, color: t.text }),
+    ...weatherIcon(kind, right - textWidth(temp, 112, 0.5) - 28 - 92, PAD_Y - 2, 92, colors, !w.current.day),
+  ];
+  const [today, ...next] = w.days;
+  const line = [t.tr(`wx_${kind}`), today && `${deg(today.max)} / ${deg(today.min)}`].filter(Boolean).join(' · ');
+  events.push(text(escape(line), { x: right, y: PAD_Y + 112, an: 9, px: 33, color: t.muted }));
+  const colW = 124;
+  next.slice(0, 3).forEach((d, i) => {
+    const cx = right - colW / 2 - (2 - i) * colW;
     events.push(
-      ...tile.events,
-      text(t.tr('scanLine1'), { x: x + tile.size + 24, y: mid - 4, an: 1, px: 30, color: t.muted }),
-      text(t.tr('scanLine2'), { x: x + tile.size + 24, y: mid + 4, an: 7, px: 30, color: t.muted }),
+      text(escape(weekday(d.date, t.tr.locale)), { x: cx, y: 250, an: 8, px: 26, weight: 600, color: t.muted }),
+      ...weatherIcon(weatherKind(d.code), cx - 20, 288, 40, colors),
+      text(`${deg(d.max)}{${paint(t.muted)}} ${deg(d.min)}`, { x: cx, y: 334, an: 8, px: 26, color: t.text }),
+    );
+  });
+  return events;
+}
+
+/**
+ * A row above the divider: the colour keys' favourites on the left
+ * (`keys` = [{ hex, name }]), and "▲ Instagram" on the right while logged in.
+ */
+function keyHints(t, keys, instagram) {
+  const y = LINE_Y - 52;
+  const events = [];
+  let x = PAD_X;
+  for (const { hex, name } of keys) {
+    const label = escape(fit(name, 30, 300));
+    events.push(
+      circle(x + 10, y, 10, { color: hex }),
+      text(label, { x: x + 10 + 22, y, an: 4, px: 30, color: t.muted }),
+    );
+    x += 10 + 22 + textWidth(label, 30, 0.53) + 48;
+  }
+  if (instagram) {
+    events.push(
+      text(`▲ {${paint(t.muted)}}${escape(t.tr('homeInstagram'))}`, { x: W - PAD_X, y, an: 6, px: 30, weight: 600, color: t.text }),
     );
   }
   return events;
 }
 
-/** Home / idle screen. `loading` = { title, channel, kind, sender } while a video starts. */
-export function home(t, { now, clock24, net, pairingCode, remote, qr, deviceName, loading, panelOpen }) {
+/**
+ * Home / idle screen. `loading` = { title, channel, kind, sender } while a
+ * video starts; `weather` (see weather()) and `keys`/`instagram` (see
+ * keyHints()) are optional.
+ */
+export function home(t, {
+  now, clock24, net, pairingCode, qr, deviceName, loading, panelOpen, weather: w, keys = [], instagram = false,
+}) {
   if (panelOpen) return clock(t, now, clock24, 0.35);
 
-  const events = [...clock(t, now, clock24), ...network(t, net), ...bottomBar(t, { pairingCode, remote, qr })];
+  const events = [...clock(t, now, clock24), ...bottomBar(t, { pairingCode, qr, net })];
+  if (w) events.push(...weather(t, w));
+  if (!loading) events.push(...keyHints(t, keys, instagram));
   if (loading) {
     // The backdrop image already has the glass card.
     events.push(...loadingText(t, 'loading', loading));
