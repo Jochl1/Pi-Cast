@@ -532,3 +532,46 @@ export function reels(t, { reel, paused: isPaused, pulse = 0 }) {
 }
 
 export { wordmark };
+
+// --- AirPlay ---
+
+/** Where the cover bitmap goes (overlay-add, so it's placed by tv.js). */
+export const AIRPLAY_COVER = { x: W - PAD_X - 620, y: 180, size: 620, r: 28 };
+
+/**
+ * Music over AirPlay, like a poster: the clock and date at the top left as on
+ * the home screen, the cover on the right (a bitmap, see AIRPLAY_COVER; a
+ * placeholder tile is drawn under it), and the title, artist and album and
+ * the progress at the bottom left. `item` = { title, artist, album,
+ * position, duration, playing }; paused adds "· PAUSED" to the label.
+ */
+export function airplay(t, { now, clock24, item }) {
+  const width = AIRPLAY_COVER.x - 96 - PAD_X;
+  const title = item.title || t.tr('airplayTitle');
+  const big = title.length <= 18;
+  const sub = [item.artist, item.album].filter(Boolean).join(' — ');
+  const c = AIRPLAY_COVER;
+  const events = [
+    ...clock(t, now, clock24),
+    rect(c.x, c.y, c.size, c.size, { color: t.surface, radius: c.r }),
+    // Paused shows here: the cover bitmap would hide anything drawn over it.
+    text(`${span('●', t.accent)}${span(' AIRPLAY', t.text)}${item.playing ? '' : span(` · ${t.tr('paused').toLocaleUpperCase(t.tr.locale)}`, t.muted)}`, {
+      x: PAD_X, y: 590, px: 27, weight: 600, spacing: 3.6, color: t.text,
+    }),
+    text(escape(fit(title, big ? 96 : 72, width, 0.52)), {
+      x: PAD_X, y: big ? 640 : 656, px: big ? 96 : 72, weight: 600, spacing: big ? -2 : -1.4, color: t.text,
+    }),
+  ];
+  if (sub) events.push(text(escape(fit(sub, 39, width)), { x: PAD_X, y: 770, px: 39, color: t.muted }));
+  if (item.duration > 0) {
+    const frac = Math.min(1, item.position / item.duration);
+    const barW = Math.min(1000, width);
+    events.push(
+      rect(PAD_X, 900, barW, 8, { color: 'rgba(255,255,255,0.18)', radius: 4 }),
+      rect(PAD_X, 900, Math.max(8, barW * frac), 8, { color: t.accent, radius: 4 }),
+      text(fmtTime(item.position), { x: PAD_X, y: 926, px: 27, font: 'JetBrains Mono', weight: 500, color: t.muted }),
+      text(fmtTime(item.duration), { x: PAD_X + barW, y: 926, an: 9, px: 27, font: 'JetBrains Mono', weight: 500, color: t.muted }),
+    );
+  }
+  return events;
+}

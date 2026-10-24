@@ -2,7 +2,7 @@ import QRCode from 'qrcode';
 import { ACCENTS, KEY_COLORS } from '../shared/theme.js';
 import { LANGUAGES } from '../shared/i18n.js';
 import { networkStatus } from '../network.js';
-import { thumbnailBgra } from './thumbnail.js';
+import { coverBgra, thumbnailBgra } from './thumbnail.js';
 import { backgroundClip, backgroundPng } from './background.js';
 import * as screens from './screens.js';
 
@@ -32,16 +32,17 @@ const PULSE_MS = 700;
 
 /**
  * Everything drawn on the TV: home screen, loading, now-playing pop-ups,
- * pause screen, settings panel, Reels and toasts. Redraws only when something
+ * pause screen, settings panel, Reels, AirPlay and toasts. Redraws only when something
  * visible changes, since every redraw costs CPU on a Pi 3.
  */
 export default class Tv {
   constructor({
-    mpv, playback, cast, settings, sounds, reels, weather, instagram, log, remote,
+    mpv, playback, cast, settings, sounds, reels, weather, instagram, airplay, log, remote,
   }) {
     Object.assign(this, {
-      mpv, playback, cast, settings, sounds, reels, weather, instagram, log, remote,
+      mpv, playback, cast, settings, sounds, reels, weather, instagram, airplay, log, remote,
     });
+    this.cover = { image: null, want: null }; // AirPlay's cover: the image and its bitmap
     this.sent = {};
     this.panel = { open: false, focus: 0 };
     this.card = null; // { until, quality }
@@ -89,6 +90,10 @@ export default class Tv {
     this.weather.on('change', () => this.render());
     // The ▲ Instagram hint shows while logged in.
     this.instagram.on('change', () => this.render());
+    this.airplay.on('change', (state) => {
+      if (state.cover !== this.cover.image) this.#prepareCover(state.cover);
+      this.render();
+    });
     settings.on('change', () => {
       this.#updateBackdrop();
       this.render();
@@ -100,12 +105,12 @@ export default class Tv {
     this.render();
   }
 
-  /** 'home' | 'loading' | 'buffering' | 'playing' | 'paused' | 'reels' */
+  /** 'home' | 'loading' | 'buffering' | 'playing' | 'paused' | 'reels' | 'airplay' */
   screen() {
     const p = this.mpv.props;
     const { source, loading, background } = this.playback;
     if (this.reels.active) return 'reels';
-    if (!source) return 'home';
+    if (!source) return this.airplay.state.active ? 'airplay' : 'home';
     if (p['idle-active'] || background.showing || loading) return 'loading';
     if (p.pause) return 'paused';
     if (this.bufferingSince && Date.now() - this.bufferingSince >= BUFFERING_MS) return 'buffering';
@@ -116,15 +121,17 @@ export default class Tv {
    * The home screen's backdrop, shown by mpv on its video plane (it would
    * never fit the OSD texture): the drifting loop clip if animation is on and
    * one was rendered for this look, otherwise a still image painted here.
+   * AirPlay's has no glass card.
    */
   async #updateBackdrop() {
     const s = this.settings.get();
     const t = screens.look(s);
-    const key = `${t.accent} ${s.bootAnimation}`;
+    const card = this.screen() !== 'airplay';
+    const key = `${t.accent} ${s.bootAnimation} ${card}`;
     if (key === this.backdropKey) return;
     this.backdropKey = key;
     try {
-      const file = (s.bootAnimation && backgroundClip(t)) || await backgroundPng(t);
+      const file = (s.bootAnimation && backgroundClip(t, { card })) || await backgroundPng(t, { card });
       if (this.backdropKey === key) this.playback.setBackground(file);
     } catch (e) {
       this.log.warn('TV background image failed:', e.message);
@@ -199,6 +206,23 @@ export default class Tv {
     this.render();
   }
 
+  /** The AirPlay cover as a bitmap in real screen pixels, with rounded corners. */
+  async #prepareCover(image) {
+    this.cover = { image, want: null };
+    if (!image) return;
+    try {
+      const s = ((await this.mpv.get('osd-height')) || screens.H) / screens.H;
+      const c = screens.AIRPLAY_COVER;
+      const size = Math.round(c.size * s);
+      const file = await coverBgra(image, size, Math.round(c.r * s));
+      if (this.cover.image !== image) return;
+      this.cover.want = { file, x: Math.round(c.x * s), y: Math.round(c.y * s), w: size, h: size };
+      this.render();
+    } catch (e) {
+      this.log.debug('AirPlay cover failed:', e.message);
+    }
+  }
+
   async #prepareThumbnail() {
     const url = this.playback.source?.thumbnail;
     this.thumb.want = null;
@@ -251,7 +275,8 @@ export default class Tv {
 
     // The home screen's backdrop is mpv's own background color: a full-screen
     // overlay would take half of the Pi 3's overlay texture (see screens.js).
-    await this.#setBackground(onHome || screen === 'loading' || screen === 'reels' ? t.bg : '#000000');
+    await this.#setBackground(onHome || ['loading', 'reels', 'airplay'].includes(screen) ? t.bg : '#000000');
+    this.#updateBackdrop(); // without the card for AirPlay
 
     const layers = {
       home: null, loading: null, reels: null, popup: null, pause: null, panel: null, toast: null,
@@ -273,6 +298,16 @@ export default class Tv {
         weather: this.weather.data,
         keys: Object.entries(KEY_COLORS).filter(([color]) => s.shortcuts[color]).map(([color, hex]) => ({ hex, name: s.shortcuts[color].name })),
         instagram: !!this.instagram.state.user,
+      });
+    }
+    // AirPlay takes the home screen's layer; the position runs on locally between updates.
+    const air = this.airplay.state;
+    if (screen === 'airplay') {
+      const position = air.position + (air.playing && air.at ? (now - air.at) / 1000 : 0);
+      layers.home = screens.airplay(t, {
+        now: new Date(now),
+        clock24: s.clock24,
+        item: { ...air, position: Math.min(position, air.duration || position) },
       });
     }
     const popup = [];
@@ -322,7 +357,8 @@ export default class Tv {
       screen === 'reels' ? screens.H / 2 : undefined);
 
     // Thumbnail: only while the card is fully visible (bitmaps can't fade).
-    const thumb = this.card && fade(this.card.until) >= 1 ? this.thumb.want : null;
+    const thumb = screen === 'airplay' ? this.cover.want
+      : this.card && fade(this.card.until) >= 1 ? this.thumb.want : null;
     await this.#showThumbnail(thumb);
 
     // Wake up again for fades and expiries.
@@ -330,6 +366,9 @@ export default class Tv {
     clearTimeout(this.timer);
     if (pulse > 0) {
       this.timer = setTimeout(() => this.render(), 120);
+    } else if (screen === 'airplay' && air.playing && air.duration) {
+      // The progress, once a second.
+      this.timer = setTimeout(() => this.render(), 1000 - ((now - air.at) % 1000) + 20);
     } else if (deadlines.length) {
       const next = Math.min(...deadlines);
       const wait = next - now > FADE_MS ? next - now - FADE_MS : 120;
@@ -399,7 +438,7 @@ export default class Tv {
     const now = new Date();
     const wait = (60 - now.getSeconds()) * 1000 - now.getMilliseconds() + 50;
     setTimeout(() => {
-      if (this.screen() === 'home') this.render();
+      if (this.screen() === 'home' || this.screen() === 'airplay') this.render();
       this.#tickClock();
     }, wait);
   }

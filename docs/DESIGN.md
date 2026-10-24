@@ -9,6 +9,7 @@ An ad-free "Chromecast replacement" for a **Raspberry Pi 3 Model B** (1 GB RAM, 
 - shows up as a cast target in the **YouTube app** and plays without ads (yt-dlp fetches the streams directly), skipping sponsor segments with SponsorBlock;
 - plays **Twitch** and other links sent from the **iPhone web app** the Pi serves, or from the "Send to Pi-Cast" iOS Shortcut in the share sheet;
 - shows **Instagram Reels**, scrolled with the remote's arrow keys;
+- is an **AirPlay speaker** for music from the iPhone (Spotify, Apple Music, …), with the cover on the TV;
 - looks like a finished product: an animated boot splash, no Linux text on screen, a home screen, now-playing pop-ups, a pause screen and a settings panel;
 - is controlled with the **TV remote over HDMI-CEC**.
 
@@ -59,8 +60,9 @@ There are 10 presets plus a custom colour: Violet `#A898FF` (default), Sky `#6FA
 5. **Paused:** dimmed video, a pause icon in an accent ring, and at the bottom the title, channel and source, an accent progress bar, and the elapsed and total times in mono.
 6. **TV settings panel:** a glass panel on the right over the dimmed home screen. Rows: accent (a swatch row), language, animations, skip sponsors, clock, switch TV input. Footer: "◀ ▶ change · OK select · Back close". OK on the home screen opens it; the arrows and Back navigate it.
 7. **Instagram Reels:** ▲ on the home screen opens them. The Reel plays upright in the middle (mpv's `background-color` fills the sides). Left: "INSTAGRAM" in the accent above "Reels", and the keys at the bottom. Right, bottom-aligned: @user, up to four caption lines (muted) and the like count with a ♥, filled in the accent once liked. OK likes with a big ♥ that fades out over the Reel. Pause shows the accent pause ring. Between Reels only the dots show in the middle, no loading card.
-8. **Toasts** for short messages, such as "Couldn't play that link", or "● Trymacs" (with the key's colour) when a colour key starts a favourite.
-9. **iPhone web app:** a header with the wordmark and a "● <TV name>" pill; a now-playing card (thumbnail, state, title and channel, progress, back 10 s / play-pause / forward 10 s, volume); a "Play a link" field; and a Recent list. Settings: the accent grid (5×2) and a custom colour; animations; device name, language, Twitch quality, SponsorBlock, 24-hour clock; colour-key favourites (name and link per colour); the CEC toggles ("Control with TV remote", "Switch TV input on cast"); and the Instagram login (username and password, a box for the security code, or a browser's session ID under "Login not working?"), which shows the account and a logout button once logged in. `#instagram` opens that section.
+8. **AirPlay**, like a poster: the clock and date at the top left as on the home screen, the cover (620 px, rounded) on the right, and at the bottom left "● AIRPLAY" (with "· PAUSED" when paused), the title (96 px, 72 px if long), artist — album, and an accent progress bar with times. It sits on the backdrop without the glass card. (A Spotify screen in this style was approved first; see AirPlay below for why it's AirPlay.)
+9. **Toasts** for short messages, such as "Couldn't play that link", or "● Trymacs" (with the key's colour) when a colour key starts a favourite.
+10. **iPhone web app:** a header with the wordmark and a "● <TV name>" pill; a now-playing card (thumbnail, state, title and channel, progress, back 10 s / play-pause / forward 10 s, volume); a "Play a link" field; and a Recent list. Settings: the accent grid (5×2) and a custom colour; animations; device name, language, Twitch quality, SponsorBlock, 24-hour clock; colour-key favourites (name and link per colour); the CEC toggles ("Control with TV remote", "Switch TV input on cast"); and the Instagram login (username and password, a box for the security code, or a browser's session ID under "Login not working?"), which shows the account and a logout button once logged in. `#instagram` opens that section.
 
 ## 3. Architecture
 
@@ -92,6 +94,7 @@ Node 22 (ESM), with `express`, `yt-cast-receiver` and `qrcode` as the only depen
 | `sounds.js` | UI sounds and the startup sound, through `bin/sounds.py` (see below). |
 | `instagram.js` | Instagram worker (`bin/insta.py`) and the login state. |
 | `reels.js` | Reels on the TV: the list, scrolling, likes, keys. |
+| `airplay.js` | AirPlay state and metadata from shairport-sync's pipe; ends a session. |
 
 ### Playback ownership
 
@@ -150,6 +153,15 @@ Node 22 (ESM), with `express`, `yt-cast-receiver` and `qrcode` as the only depen
 - `Reels` ends when anyone else plays something, or when playback stops (web app, standby). A Reel that fails is skipped; three in a row close Reels.
 - Remote keys go through `remoteKey()` in `index.js`: colour keys, then Reels, then the settings panel, then ▲ on home (opens Reels), then the playback keys. `/api/tv/key` uses the same path.
 - The like sound isn't played: mpv holds the HDMI audio device while a Reel plays (§4.5).
+
+### AirPlay
+
+- **Spotify Connect doesn't work** for this account: go-librespot 0.10.5 (and librespot, the same method) got "failed retrieving aes key with code 1" for every track. Spotify refuses the decryption keys to unofficial clients for some Premium accounts since early 2026 ([go-librespot #279](https://github.com/devgianlu/go-librespot/issues/279)); no workaround is known. So music comes over AirPlay instead.
+- **shairport-sync** (Debian's 4.3.7, AirPlay 1) plays on its own as "pi-cast", straight to `hdmi:CARD=vc4hdmi,DEV=0`. It uses about 8% CPU on the throttled Pi. Skip and pause take 1–2 s: AirPlay 1 keeps a 2 s buffer at the receiver.
+- `airplay.js` reads its metadata pipe (`/tmp/shairport-sync-metadata`, XML items with base64 data): `abeg`/`aend` (session), `pbeg`/`prsm` and `pend`/`pfls` (playing), `minm`/`asar`/`asal` between `mdst` and `mden` (title, artist, album), `prgr` (RTP start/current/end at 44.1 kHz) and `PICT` (the cover, saved to `data/airplay/`). The pipe hits EOF whenever shairport-sync closes it, so it's reopened.
+- **Sharing the audio device** (§4.5): the sounds helper keeps off it while a session is on. A video takes over: `mpv.beforeLoad` ends the session first by restarting shairport-sync (it has no command for that; a sudoers rule allows exactly `systemctl restart shairport-sync`). A session starting stops whatever plays. Back or Stop on the AirPlay screen ends it too.
+- The TV shows the AirPlay screen while a session is on and nothing else plays. The cover is an `overlay-add` bitmap (premultiplied BGRA with rounded corners in its alpha, `coverBgra()`), so "paused" goes into the label: anything drawn over the cover would be hidden under it (§4.2). The progress is redrawn once a second.
+- The backdrop under it has no glass card, so there's a second set of loop clips (`backgroundSpec(t, { card: false })`; `render-backdrops.js` renders both sets, about 48 MB per clip).
 
 ### Twitch
 
@@ -264,13 +276,16 @@ Measured on a Pi 3 with Raspberry Pi OS Lite 64-bit (Trixie, mpv 0.40, Mesa 26).
 
 ### 4.4 Power
 
-The Pi 3 throttles from 1200 to 600 MHz on undervoltage (`vcgencmd get_throttled` reports `0x50005`). That roughly halves everything CPU-bound, yt-dlp especially, and writing to the SD card on low voltage corrupts it. Use the official 5.1 V / 2.5 A supply.
+The Pi 3 throttles from 1200 to 600 MHz on undervoltage (`vcgencmd get_throttled` reports `0x50005`). That roughly halves everything CPU-bound, yt-dlp especially, and writing to the SD card on low voltage corrupts it. Use the official 5.1 V / 2.5 A supply. On 2026-10-24 the Pi also rebooted by itself (nobody unplugged it) while copying files over Wi-Fi, still on the 18 W brick.
 
 ### 4.5 Audio
 
 - HDMI audio is card `vc4hdmi`, with a single subdevice. The `hdmi:` device is an `iec958` plugin over `hw`, so `dmix` can't sit under it (it would mix IEC958 subframes). A second program gets `EBUSY` while mpv has it open.
 - mpv closes its audio output when the next file has no audio (the backdrop), and keeps it open while a video is paused.
 - The sounds helper takes about 0% CPU while it writes silence.
+- **No picture, no sound:** with mpv stopped, nothing drives the HDMI output and audio written to the device is silent. mpv must keep showing something (the backdrop) for AirPlay to be heard.
+- The sounds helper grabs the device in any gap (it holds it whenever nothing plays), even between two AirPlay songs, so it has to know about other programs (see AirPlay).
+- shairport-sync's default volume curve turns a third of the phone's volume into −43 dB, which is nearly silent on a TV.
 
 ## 5. Open work
 
@@ -284,7 +299,6 @@ The Pi 3 throttles from 1200 to 600 MHz on undervoltage (`vcgencmd get_throttled
 ### Ideas for later (from the user, not designed yet)
 
 - **Party games with the phone as controller:** Pong, Connect 4, tic-tac-toe and other simple games. The TV shows the game; phones join through the web app (QR code) and send input over the same HTTP/SSE channel.
-- **Spotify:** pi-cast as a Spotify Connect speaker (librespot, e.g. via raspotify; needs Premium), with the cover, title and progress on the TV. librespot needs the HDMI audio device, which mpv and the sounds helper also want (§4.5). It could hand its audio to mpv through a pipe, or take the device the way the sounds helper does.
 - **Colour key legend, more:** the home screen shows the favourites now; for Twitch favourites it could also show who's live right now.
 - **Profiles:** a "Who's watching?" picker at startup, like Netflix, chosen with the arrow keys. Each profile has its own colour keys, accent, Recent list, language and, later, Instagram account.
 - **AirPlay screen mirroring** from the iPhone, with UxPlay (open-source AirPlay server; GStreamer, hardware H.264 through v4l2). It's an experiment on a Pi 3:

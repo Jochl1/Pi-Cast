@@ -4,6 +4,7 @@ An ad-free "Chromecast" for a Raspberry Pi 3. It shows up as a cast target in th
 
 - **YouTube:** cast from the YouTube app. Videos are fetched directly with yt-dlp, so YouTube ads never play. Sponsor segments are skipped with SponsorBlock.
 - **Twitch and other links:** paste them into the web app, or use Share → **Send to Pi-Cast**. streamlink filters out Twitch's ad breaks.
+- **Music over AirPlay:** pick pi-cast as the AirPlay speaker in Spotify, Apple Music or any app on the iPhone. The TV shows the cover, title and progress.
 - **Instagram Reels:** scroll through the Reels tab on the TV with the remote's arrow keys and like with OK. Use a second account: this goes through Instagram's private app API, which Instagram doesn't allow, so the account can get locked.
 - **TV:** animated boot splash, a home screen with a clock, now-playing pop-ups, a pause screen and a settings panel. Soft menu sounds and an optional startup sound. No Linux text on screen.
 
@@ -34,9 +35,9 @@ sudo reboot
 
 The installer takes 10–20 minutes on a Pi 3. You can run it again at any time, for example after a `git pull`. It skips what's already done, and it backs up every system file it changes to `/var/backups/picast/`.
 
-What it sets up: mpv, ffmpeg, Node.js 22, yt-dlp, streamlink and instagrapi (in `.venv/`), the fonts, the SponsorBlock script, a `picast` service that starts at boot, a daily yt-dlp/streamlink update (YouTube breaks old versions regularly), Wi-Fi power saving turned off, and the boot splash.
+What it sets up: mpv, ffmpeg, Node.js 22, yt-dlp, streamlink and instagrapi (in `.venv/`), shairport-sync for AirPlay, the fonts, the SponsorBlock script, a `picast` service that starts at boot, a daily yt-dlp/streamlink update (YouTube breaks old versions regularly), Wi-Fi power saving turned off, and the boot splash.
 
-**Optional: the drifting home background.** The Pi paints a still background itself. The animated one is a set of video loops, one per accent color, too slow to make on a Pi 3. Render them on a computer with Node.js and ffmpeg (about 20 s and 50 MB each), then copy them over:
+**Optional: the drifting home background.** The Pi paints a still background itself. The animated one is a set of video loops, one per accent color and each with and without the glass card (the AirPlay screen has none), too slow to make on a Pi 3. Render them on a computer with Node.js and ffmpeg (about 20 s and 50 MB each, about 1 GB in all), then copy them over:
 
 ```sh
 node scripts/render-backdrops.js
@@ -59,6 +60,12 @@ You get the remote (play/pause, ±10 s, volume, "Play a link", Recent) and all s
 In the web app, open Settings → Instagram and log in. If Instagram sends a security code, a box for it appears. pi-cast keeps the session in `data/instagram.json`, never the password.
 
 Logging in with a password often fails at the moment with "your version of Instagram is out of date" (an [instagrapi bug](https://github.com/subzeroid/instagrapi/issues/2807)). Then use **Login not working?**: log in on instagram.com in a browser on a computer, open the developer tools (F12) → Application → Cookies → `https://www.instagram.com`, and paste the value of `sessionid`. Don't log out in that browser afterwards, or the session ends.
+
+### Music (AirPlay)
+
+In Spotify (or any music app), tap the device icon → **AirPlay** → **pi-cast**. The music plays through the TV, which shows the cover, title and progress. Skip and pause take a second or two to arrive (AirPlay buffers). Back on the TV remote ends it. Casting a video while music plays stops the music; choosing pi-cast for music stops a video.
+
+Spotify's own "Connect to a device" (Spotify Connect) isn't supported: Spotify refuses unofficial players for many accounts.
 
 ### "Send to Pi-Cast" in the share sheet
 
@@ -91,7 +98,7 @@ TV remote keys:
 | OK | open settings | change value | play / pause | like / unlike |
 | ◀ ▶ | | change value | −10 s / +10 s | −5 s / +5 s |
 | ▲ ▼ | ▲ opens Instagram Reels | move between rows | | previous / next Reel |
-| Back | | close | stop | back to home |
+| Back | | close | stop | back to home (AirPlay: end it) |
 | Play, Pause, Stop, ⏪ ⏩ | | | what they say | what they say |
 | Red, green, yellow, blue | play that key's favourite | play that key's favourite | switch to that key's favourite | switch to that key's favourite |
 

@@ -54,12 +54,15 @@ export function shiftHue([r, g, b], deg, { sat = 1, light = 1 } = {}) {
   return [R, G, B].map((v) => (v + m) * 255);
 }
 
-/** Everything the image depends on; also its cache key. */
-export function backgroundSpec(t) {
+/**
+ * Everything the image depends on; also its cache key. `card`: the frosted
+ * card behind "Ready to cast" (the AirPlay screen has none).
+ */
+export function backgroundSpec(t, { card = true } = {}) {
   const accent = rgb(t.accent);
   // The accent at the top left, a neighbouring hue at the bottom right and a
   // soft third light at the top right, like the draft's glows.
-  const spec = { bg: rgb(t.bg), glows: [], vignette: 0.35, card: true };
+  const spec = { bg: rgb(t.bg), glows: [], vignette: 0.35, card };
   spec.top = shiftHue(rgb(t.bg), 0, { light: 1.5 });
   spec.glows = [
     // `drift`: how far (px) and how much brighter each one moves around its
@@ -94,6 +97,7 @@ export function painter(spec, w = W, h = H) {
       const vx = (x - w / 2) / (w / 2);
       const vy = (y - h / 2) / (h / 2);
       vig[i] = 1 - spec.vignette * smoothstep(0.5, 1.45, Math.sqrt(vx * vx + vy * vy));
+      if (!spec.card) continue;
       // Frosted card behind "Ready to cast": signed distance to a rounded
       // rect, antialiased over one pixel, with a brighter top-left edge.
       const qx = Math.abs(x + 0.5 - (box.x + box.w / 2)) - box.w / 2 + box.r;
@@ -230,15 +234,15 @@ function paintInWorker(spec) {
 /** Identifies a backdrop by everything it depends on; names its PNG and clip. */
 export const backdropKey = (spec) => crypto.createHash('sha1').update(JSON.stringify(spec)).digest('hex').slice(0, 16);
 
-/** Path of the loop clip for theme `t`, or null if none was rendered for it. */
-export function backgroundClip(t) {
-  const file = path.join(CLIP_DIR, `${backdropKey(backgroundSpec(t))}.mp4`);
+/** Path of the loop clip for theme `t`, or null if none was rendered for it. `opts` as for backgroundSpec(). */
+export function backgroundClip(t, opts) {
+  const file = path.join(CLIP_DIR, `${backdropKey(backgroundSpec(t, opts))}.mp4`);
   return fs.existsSync(file) ? file : null;
 }
 
-/** Path of the background PNG for theme `t`, painted on first use and cached. */
-export async function backgroundPng(t) {
-  const spec = backgroundSpec(t);
+/** Path of the background PNG for theme `t`, painted on first use and cached. `opts` as for backgroundSpec(). */
+export async function backgroundPng(t, opts) {
+  const spec = backgroundSpec(t, opts);
   const key = backdropKey(spec);
   const file = path.join(DIR, `${key}.png`);
   if (fs.existsSync(file)) {

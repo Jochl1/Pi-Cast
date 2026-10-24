@@ -8,6 +8,7 @@ import Ytdl from './ytdl.js';
 import Instagram from './instagram.js';
 import Reels from './reels.js';
 import Weather, { findPlace } from './weather.js';
+import AirPlay from './airplay.js';
 import Playback from './playback.js';
 import Cast from './cast.js';
 import Settings, { streamlinkQuality } from './settings.js';
@@ -122,12 +123,26 @@ settings.on('change', (values, changed) => {
 });
 
 // --- TV screens ---
-const sounds = new Sounds({ config, mpv, playback, settings, log });
+const airplay = new AirPlay(log);
+airplay.start();
+const sounds = new Sounds({
+  config, mpv, playback, airplay, settings, log,
+});
 sounds.start();
+// A video takes the audio device from AirPlay (the session ends on the phone);
+// AirPlay starting stops whatever plays, since picking pi-cast means music.
+const releaseSounds = mpv.beforeLoad;
+mpv.beforeLoad = async () => {
+  await airplay.release();
+  await releaseSounds?.();
+};
+airplay.on('session', (on) => {
+  if (on && playback.source) controls.stop().catch((e) => log.warn('stopping for AirPlay failed:', e.message));
+});
 const weather = new Weather({ settings, log });
 weather.start();
 const tv = new Tv({
-  mpv, playback, cast, settings, sounds, reels, weather, instagram, log,
+  mpv, playback, cast, settings, sounds, reels, weather, instagram, airplay, log,
   remote: `${os.hostname()}.local:${config.webPort}`,
 });
 tv.start();
@@ -176,6 +191,10 @@ function remoteKey(key) {
   }
   // Reels, then the settings panel (and OK on the home screen) come first.
   if (reels.key(key) || tv.key(key)) return true;
+  if (tv.screen() === 'airplay' && (key === 'back' || key === 'stop')) {
+    airplay.release();
+    return true;
+  }
   if (key === 'up' && tv.screen() === 'home') {
     reels.open().catch((e) => log.warn('opening Reels failed:', e.message));
     return true;

@@ -1,6 +1,7 @@
 // Renders the animated home backdrops (looping clips of the drifting glows)
-// for every accent preset. Too slow for a Pi 3, so run it on a PC with
-// ffmpeg (libx264), then copy the clips to the Pi's data/backdrops/:
+// for every accent preset, with the glass card (home) and without (AirPlay).
+// Too slow for a Pi 3, so run it on a PC with ffmpeg (libx264), then copy the
+// clips to the Pi's data/backdrops/:
 //   node scripts/render-backdrops.js [out-dir] [ffmpeg]
 //   pscp data/backdrops/*.mp4 admin@picast.local:Pi-Cast/data/backdrops/
 // Clips are named by the backdrop's content, so stale ones are just unused.
@@ -37,15 +38,18 @@ function encode(spec, file) {
 }
 
 fs.mkdirSync(outDir, { recursive: true });
-for (const accent of Object.keys(ACCENTS)) {
-  const spec = backgroundSpec(themeFor({ accent }));
-  const key = backdropKey(spec);
-  const file = path.join(outDir, `${key}.mp4`);
-  if (fs.existsSync(file)) {
-    console.log(`have   ${accent} ${key}`);
-    continue;
+for (const card of [true, false]) {
+  for (const accent of Object.keys(ACCENTS)) {
+    const spec = backgroundSpec(themeFor({ accent }), { card });
+    const key = backdropKey(spec);
+    const file = path.join(outDir, `${key}.mp4`);
+    const name = `${accent}${card ? '' : ' (no card)'}`;
+    if (fs.existsSync(file)) {
+      console.log(`have   ${name} ${key}`);
+      continue;
+    }
+    const t0 = Date.now();
+    await encode(spec, file);
+    console.log(`render ${name} ${key} ${((Date.now() - t0) / 1000).toFixed(0)}s ${(fs.statSync(file).size / 1e6).toFixed(0)} MB`);
   }
-  const t0 = Date.now();
-  await encode(spec, file);
-  console.log(`render ${accent} ${key} ${((Date.now() - t0) / 1000).toFixed(0)}s ${(fs.statSync(file).size / 1e6).toFixed(0)} MB`);
 }

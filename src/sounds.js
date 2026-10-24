@@ -16,11 +16,12 @@ const REPLY_TIMEOUT_MS = 2000;
  * The HDMI audio device takes one program at a time, so the helper only holds
  * it while nothing plays and mpv's audio output is closed; mpv.beforeLoad
  * makes it let go before mpv opens anything that may have sound. So there are
- * no UI sounds during videos (or over a paused one).
+ * no UI sounds during videos (or over a paused one). It also keeps off the
+ * device while an AirPlay session is on (shairport-sync plays by itself).
  */
 export default class Sounds {
-  constructor({ config, mpv, playback, settings, log }) {
-    Object.assign(this, { mpv, playback, settings, log });
+  constructor({ config, mpv, playback, airplay, settings, log }) {
+    Object.assign(this, { mpv, playback, airplay, settings, log });
     // mpv's ALSA device ('alsa/hdmi:...') without the 'alsa/' prefix.
     const dev = config.mpvAudioDevice?.startsWith('alsa/') ? config.mpvAudioDevice.slice(5) : 'default';
     this.device = `plug:'${dev}'`;
@@ -36,7 +37,7 @@ export default class Sounds {
   start() {
     if (this.disabled) return;
     this.mpv.beforeLoad = () => this.#release();
-    for (const emitter of [this.mpv, this.playback]) {
+    for (const emitter of [this.mpv, this.playback, this.airplay]) {
       emitter.on(emitter === this.mpv ? 'property' : 'change', () => this.#update());
     }
     this.#spawn();
@@ -61,9 +62,9 @@ export default class Sounds {
     }
   }
 
-  /** True while the device may be held: nothing playing and mpv's audio closed. */
+  /** True while the device may be held: nothing playing, mpv's audio closed and no AirPlay. */
   #free() {
-    return !this.playback.source && !this.mpv.props['current-ao'];
+    return !this.playback.source && !this.mpv.props['current-ao'] && !this.airplay.state.active;
   }
 
   #update() {

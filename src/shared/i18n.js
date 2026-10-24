@@ -48,6 +48,7 @@ const STRINGS = {
     startingUp: 'STARTING UP',
     // TV: Instagram Reels
     reelsTitle: 'Reels',
+    airplayTitle: 'AirPlay',
     reelsKeyScroll: 'Next / previous',
     reelsKeyLike: 'Like',
     reelsKeySeek: '5 seconds',

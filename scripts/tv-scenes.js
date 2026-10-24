@@ -90,6 +90,20 @@ export const scenes = {
       keys: [{ hex: '#FF5D5D', name: 'Trymacs' }, { hex: '#4BE3B0', name: 'BigSpin' }, { hex: '#FFD23F', name: 'Lofi Girl' }, { hex: '#4D7CFF', name: 'Kurzgesagt' }],
     })],
   },
+  airplay: {
+    settings: de,
+    layers: (t) => [screens.airplay(t, {
+      now, clock24: true,
+      item: { title: 'Flying High', artist: 'DCX, DJ Square', album: 'Flying High (Dj Square Hardcore Remix)', position: 83, duration: 201, playing: true },
+    })],
+  },
+  'airplay-paused+toast': {
+    settings: de,
+    layers: (t) => [screens.airplay(t, {
+      now, clock24: true,
+      item: { title: 'A much longer song title that has to be cut', artist: 'Someone', album: '', position: 10, duration: 0, playing: false },
+    }), screens.toast(t, toastText)],
+  },
   // German: the longest texts.
   'home-de': { settings: de, layers: (t) => [screens.home(t, homeState)] },
   'loading-de': {
