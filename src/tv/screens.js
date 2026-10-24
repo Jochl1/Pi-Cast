@@ -131,13 +131,8 @@ export function home(t, { now, clock24, net, pairingCode, remote, qr, deviceName
 
   const events = [...clock(t, now, clock24), ...network(t, net), ...bottomBar(t, { pairingCode, remote, qr })];
   if (loading) {
-    const sub = [loading.channel, SOURCE[loading.kind], loading.sender && `from ${loading.sender}`].filter(Boolean).join(' · ');
-    events.push(
-      text('LOADING', { x: W / 2, y: 430, an: 8, px: 30, weight: 600, spacing: 3.6, color: t.accent }),
-      text(escape(fit(loading.title || 'Getting the video ready', 60, 1500)), { x: W / 2, y: 478, an: 8, px: 60, weight: 600, color: t.text }),
-      text(escape(fit(sub, 39, 1500)), { x: W / 2, y: 572, an: 8, px: 39, color: t.muted }),
-      ...dots(t, W / 2, 680),
-    );
+    // The backdrop image already has the glass card.
+    events.push(...loadingText(t, 'LOADING', loading));
   } else {
     events.push(
       text('Ready to cast', { x: W / 2, y: 452, an: 8, px: 78, weight: 600, spacing: -0.8, color: t.text }),
@@ -147,9 +142,47 @@ export function home(t, { now, clock24, net, pairingCode, remote, qr, deviceName
   return events;
 }
 
-/** Three dots, middle one in the accent color (as on the boot screen). */
-export function dots(t, cx, cy) {
-  return [-24, 0, 24].map((dx) => circle(cx + dx, cy, 9, { color: dx === 0 ? t.accent : t.dim }));
+// The glass card in the middle of the home backdrop (see background.js).
+export const CARD = { x: 320, y: 440, w: 1280, h: 222, r: 56 };
+const DOTS_Y = CARD.y + CARD.h + 64;
+
+/** Label, title and source line of the loading card. `item` = { title, channel, kind, sender }. */
+function loadingText(t, label, item, onVideo = false) {
+  const sub = [item.channel, SOURCE[item.kind], item.sender && `from ${item.sender}`].filter(Boolean).join(' · ');
+  const color = onVideo ? ON_VIDEO : t;
+  return [
+    text(label, { x: W / 2, y: CARD.y + 34, an: 8, px: 30, weight: 600, spacing: 3.6, color: t.accent }),
+    text(escape(fit(item.title || 'Getting the video ready', 54, CARD.w - 120, 0.5)), {
+      x: W / 2, y: CARD.y + 76, an: 8, px: 54, weight: 600, color: color.text,
+    }),
+    text(escape(fit(sub, 36, CARD.w - 120)), { x: W / 2, y: CARD.y + 158, an: 8, px: 36, color: color.muted }),
+  ];
+}
+
+/**
+ * Loading card over a video: dimmed video and a glass card like the
+ * backdrop's. `label` is 'LOADING' (the next video starts) or 'BUFFERING'.
+ */
+export function loadingOverVideo(t, label, item) {
+  return [
+    rect(0, 0, W, H, { color: ON_VIDEO.dim }),
+    rect(CARD.x, CARD.y, CARD.w, CARD.h, { color: t.glass, radius: CARD.r }),
+    ...loadingText(t, label, item, true),
+  ];
+}
+
+/**
+ * The three loading dots under the card, pulsing one after another (the
+ * middle one in the accent, as on the boot screen). `phase` runs 0..1 per
+ * cycle; redrawn a few times a second on a layer of their own.
+ */
+export function dots(t, phase, cx = W / 2, cy = DOTS_Y) {
+  return [-1, 0, 1].map((i) => {
+    // Each dot swells and brightens in turn.
+    const p = (phase - (i + 1) / 3 + 1) % 1;
+    const pulse = Math.max(0, Math.cos(p * 2 * Math.PI)) ** 2;
+    return circle(cx + i * 36, cy, 9 + 4 * pulse, { color: i === 0 ? t.accent : t.text, opacity: i === 0 ? 0.55 + 0.45 * pulse : 0.25 + 0.5 * pulse });
+  });
 }
 
 /** "<sender> connected" pill, top right. */

@@ -32,7 +32,11 @@ export const scenes = {
   },
   loading: {
     settings: base,
-    layers: (t) => [screens.home(t, { ...homeState, loading: { ...video, sender: 'iPhone' } })],
+    layers: (t) => [screens.home(t, { ...homeState, loading: { ...video, sender: 'iPhone' } }), screens.dots(t, 0.3)],
+  },
+  'loading-over-video': {
+    settings: base, video: true,
+    layers: (t) => [screens.loadingOverVideo(t, 'LOADING', { ...video, sender: 'iPhone' }), screens.dots(t, 0.6)],
   },
   playing: {
     settings: base, video: true,
@@ -51,6 +55,11 @@ export const scenes = {
   },
   toast: { settings: base, video: true, layers: (t) => [screens.toast(t, toastText)] },
   // Worst cases: the biggest screens with a toast on top.
+  'buffering+popup+toast': {
+    settings: base, video: true,
+    layers: (t) => [screens.loadingOverVideo(t, 'BUFFERING', video), screens.dots(t, 0),
+      screens.senderPill(t, 'iPhone'), screens.toast(t, toastText)],
+  },
   'paused+toast': { settings: base, video: true, layers: (t) => [screens.paused(t, video), screens.toast(t, toastText)] },
   'settings+toast': {
     settings: base,

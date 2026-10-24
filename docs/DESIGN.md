@@ -48,7 +48,9 @@ There are 10 presets plus a custom colour: Violet `#A898FF` (default), Sky `#6FA
 
 1. **Boot splash (Plymouth):** the wordmark centred, three dots below it (the middle one in the accent), "STARTING UP" at the bottom, and the two glows drifting slowly on 14–18 s loops. The "Animated boot" setting freezes them.
 2. **Home:** the backdrop above, a large clock (24h/12h) and the date at the top left, Wi-Fi status at the top right, "Ready to cast" with a one-line hint in the centre, and a bottom bar with the TV code (pairing code), the remote address, a QR code for it ("Scan with your phone camera") and a small wordmark.
-3. **Loading:** shown while a new item starts, with the title and the sender when they're known.
+3. **Loading:** shown while a new item starts. "LOADING" in the accent, the title, and channel · source · "from <sender>" in the glass card in the middle, with three dots below it that pulse one after another (the middle one in the accent).
+   - From home it sits on the backdrop's card. When casting over a playing video, the old video freezes, dimmed, under a glass card of the same size.
+   - The same card says "BUFFERING" when a video stalls for more than a second.
 4. **Now-playing pop-ups** that fade after about 5 s: a "<sender> connected" pill at the top right; a card at the bottom left with the thumbnail, "NOW PLAYING" in the accent, the title, and the source and quality; and a thin accent progress line.
 5. **Paused:** dimmed video, a pause icon in an accent ring, and at the bottom the title, channel and source, an accent progress bar, and the elapsed and total times in mono.
 6. **TV settings panel:** a glass panel on the right over the dimmed home screen. Rows: accent (a swatch row), animations, skip sponsors, clock, switch TV input. Footer: "◀ ▶ change · OK select · Back close". OK on the home screen opens it; the arrows and Back navigate it.
@@ -94,6 +96,8 @@ Node 22 (ESM), with `express`, `yt-cast-receiver` and `qrcode` as the only depen
 - To the rest of the app it's idle: `status()` reports `idle` with no position, `Tv.screen()` is `'home'` without a source, and the controls ignore pause/seek without one. The SponsorBlock restart waits for "no source" instead of `idle-active`.
 - If it fails to open, it's not retried; mpv's `background-color` stays as the fallback.
 
+**While a new item loads, the picture holds still:** `play()` pauses whatever is showing (the old video or the backdrop clip), and the next `loadfile` unpauses. `status()` doesn't report that as paused. Going back to the backdrop resumes it.
+
 ### mpv
 
 - Started once with `--idle --force-window` and an IPC socket, and kept running. `deploy/mpv.conf` is included with `--include`; hwdec and the audio device come from `config.json`.
@@ -131,7 +135,8 @@ streamlink with `--player-external-http` on `127.0.0.1`; Pi-Cast waits for its U
 
 ### TV renderer
 
-- Text and shapes are ASS `osd-overlay`s at 1920×1080, one per layer: home, pop-up, pause, panel, toast, in that z order.
+- Text and shapes are ASS `osd-overlay`s at 1920×1080, one per layer: home, loading (over video), dots, pop-up, pause, panel, toast, in that z order.
+- The loading dots are the only animation: their own small layer, redrawn 4 times a second while the screen is loading or buffering, and nothing else is redrawn for them.
 - The thumbnail is an `overlay-add` raw BGRA bitmap converted with ffmpeg.
 - **The home backdrop** is shown by mpv on its video plane (see Playback ownership), so it costs no OSD texture.
   - The still version is painted in floating point by `background.js` in a worker thread (about 10 s on a throttled Pi, cached by content in `data/background/`) and dithered by about one level. Rounding the dark, soft gradients straight to 8 bits banded badly on the TV.
@@ -210,6 +215,8 @@ Measured on a Pi 3 with Raspberry Pi OS Lite 64-bit (Trixie, mpv 0.40, Mesa 26).
 - Dark, soft 8-bit gradients band visibly on this TV. A dither of about one level fixes it. Film grain via an SVG `feTurbulence` filter was far too strong, because rsvg runs filters in linear RGB.
 - The dither has to survive encoding: CRF 16 x264 banded again, CRF 10 with `-tune grain` doesn't. Half resolution (540p, scaled up by the display) looked blotchy.
 - The Pi 3's hardware encoder (`h264_v4l2m2m`) ignored the bitrate and came out blocky. x264 manages about 3 fps at 1080p on a throttled Pi, and painting a frame in JS took about 0.7 s even after optimising, so the clips are rendered on a PC.
+
+- Redrawing overlays over **moving** video is expensive on the Pi 3: a full-screen dim over playing video cost mpv about 15–20% more CPU, and the dots another 15–20%, which slowed yt-dlp's resolving. Over a paused frame it's cheap. While the backdrop clip played, the dots' redraws also made the screen **flicker black** every few frames. Pausing whatever is on screen during loading fixed both.
 
 ### 4.4 Power
 

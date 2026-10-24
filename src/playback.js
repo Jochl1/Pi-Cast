@@ -112,7 +112,10 @@ export default class Playback extends EventEmitter {
     const bg = this.background;
     const { file } = bg;
     if (!file || bg.failed === file) return false;
-    if (bg.showing && bg.loaded === file) return true;
+    if (bg.showing && bg.loaded === file) {
+      if (this.mpv.props.pause) await this.mpv.resume(); // paused by play()
+      return true;
+    }
     await this.mpv.set('image-display-duration', 'inf');
     const id = await this.mpv.load(file, { loop: true });
     Object.assign(bg, { loaded: file, id });
@@ -146,7 +149,6 @@ export default class Playback extends EventEmitter {
   async play(url, { owner, start = 0 }) {
     const kind = classify(url);
     const previous = this.owner;
-    const wasPlaying = !!this.source;
     this.switching = true;
     this.timing = { request: Date.now() };
     this.loading = true;
@@ -156,6 +158,11 @@ export default class Playback extends EventEmitter {
     if (previous && previous !== owner) this.emit('takeover', previous);
     this.emit('play', { owner, url, kind });
     this.emit('change');
+    // Whatever is on screen (the old video, dimmed under the loading card, or
+    // the backdrop) holds still while the new item loads: overlays redrawn
+    // over moving video cost CPU that yt-dlp needs, and made the backdrop
+    // clip flicker black.
+    if (!this.mpv.props['idle-active']) await this.mpv.pause().catch(() => {});
     this.log.info(`play [${owner}/${kind}] ${url}${start ? ` @${start}s` : ''}`);
 
     // Fetched in parallel with loading; shown as soon as it arrives.
@@ -175,13 +182,7 @@ export default class Playback extends EventEmitter {
         await this.mpv.load(local, { title: source.title ?? url });
         this.#mark('loadfile');
       } else {
-        let direct = null;
-        if (kind === 'youtube') {
-          // Resolving takes seconds: show the loading screen over the
-          // backdrop, not over the old video.
-          if (wasPlaying) await this.#toIdle();
-          direct = await this.#resolve(url);
-        }
+        const direct = kind === 'youtube' ? await this.#resolve(url) : null;
         if (this.source !== source) {
           // Replaced or stopped while yt-dlp was busy.
           if (!this.source) this.switching = false;
@@ -244,7 +245,7 @@ export default class Playback extends EventEmitter {
       idle: !s || !!p['idle-active'],
       // Between asking for a video and its first frame (yt-dlp is slow on a Pi 3).
       loading: !!s && (this.loading || !!p['paused-for-cache']),
-      paused: !!s && !!p.pause,
+      paused: !!s && !this.loading && !!p.pause, // play() holds the old picture still while loading
       live: s?.kind === 'twitch',
       position: s ? p['time-pos'] ?? 0 : 0,
       duration: s ? p.duration ?? 0 : 0,

@@ -9,6 +9,8 @@ import * as screens from './screens.js';
 // bitmap, which mpv always draws above all of these.
 const LAYERS = {
   home: { id: 2, z: 1 },
+  loading: { id: 7, z: 2 },
+  dots: { id: 8, z: 3 },
   popup: { id: 3, z: 5 },
   pause: { id: 4, z: 6 },
   panel: { id: 5, z: 8 },
@@ -18,6 +20,10 @@ const THUMB_OVERLAY = 0;
 const POPUP_MS = 5000;
 const FADE_MS = 600;
 const TOAST_MS = 5000;
+const DOTS_MS = 250; // dots redraw interval (each redraw re-composites the overlays)
+const DOTS_CYCLE_MS = 1200;
+// Short stalls don't get the buffering card.
+const BUFFERING_MS = 1000;
 
 /**
  * Everything drawn on the TV: home screen, loading, now-playing pop-ups,
@@ -37,6 +43,8 @@ export default class Tv {
     this.timer = null;
     this.scheduled = false;
     this.backdropKey = null;
+    this.dotsTimer = null;
+    this.bufferingSince = null;
     // The web remote's address as a QR code on the home screen.
     const { modules } = QRCode.create(`http://${remote}`, { errorCorrectionLevel: 'M' });
     this.qr = Array.from({ length: modules.size }, (_, r) => Array.from({ length: modules.size }, (_, c) => !!modules.get(r, c)));
@@ -50,7 +58,11 @@ export default class Tv {
       this.thumb.shown = null;
       this.render();
     });
-    mpv.on('property', (name) => {
+    mpv.on('property', (name, value) => {
+      if (name === 'paused-for-cache') {
+        this.bufferingSince = value ? Date.now() : null;
+        if (value) setTimeout(() => this.render(), BUFFERING_MS + 50);
+      }
       // time-pos only matters for the progress bars.
       if (name !== 'time-pos' || this.screen() === 'paused' || this.card) this.render();
     });
@@ -75,13 +87,15 @@ export default class Tv {
     this.render();
   }
 
-  /** 'home' | 'loading' | 'playing' | 'paused' */
+  /** 'home' | 'loading' | 'buffering' | 'playing' | 'paused' */
   screen() {
     const p = this.mpv.props;
     const { source, loading, background } = this.playback;
     if (!source) return 'home';
     if (p['idle-active'] || background.showing || loading) return 'loading';
-    return p.pause ? 'paused' : 'playing';
+    if (p.pause) return 'paused';
+    if (this.bufferingSince && Date.now() - this.bufferingSince >= BUFFERING_MS) return 'buffering';
+    return 'playing';
   }
 
   /**
@@ -197,7 +211,10 @@ export default class Tv {
     const t = themeFor(s);
     const screen = this.screen();
     const status = this.playback.status();
-    const onHome = screen === 'home' || screen === 'loading';
+    // While switching videos the old one keeps playing under the loading card.
+    const p = this.mpv.props;
+    const overVideo = screen === 'buffering' || (screen === 'loading' && !p['idle-active'] && !this.playback.background.showing);
+    const onHome = screen === 'home' || (screen === 'loading' && !overVideo);
     if (screen !== 'home') this.panel.open = false;
 
     const fade = (until) => (until > now ? Math.min(1, (until - now) / FADE_MS) : 0);
@@ -209,11 +226,14 @@ export default class Tv {
 
     // The home screen's backdrop is mpv's own background color: a full-screen
     // overlay would take half of the Pi 3's overlay texture (see screens.js).
-    await this.#setBackground(onHome ? t.bg : '#000000');
+    await this.#setBackground(onHome || screen === 'loading' ? t.bg : '#000000');
 
-    const layers = { home: null, popup: null, pause: null, panel: null, toast: null };
+    const layers = { home: null, loading: null, popup: null, pause: null, panel: null, toast: null };
+    const sender = status.owner === 'cast' ? this.cast.senders()[0] : null;
+    if (overVideo) {
+      layers.loading = screens.loadingOverVideo(t, screen === 'buffering' ? 'BUFFERING' : 'LOADING', { ...status, sender });
+    }
     if (onHome) {
-      const sender = status.owner === 'cast' ? this.cast.senders()[0] : null;
       layers.home = screens.home(t, {
         now: new Date(now),
         clock24: s.clock24,
@@ -251,6 +271,7 @@ export default class Tv {
     for (const [name, events] of Object.entries(layers)) {
       await this.#send(name, events ? events.join('\n') : null);
     }
+    this.#animateDots(screen === 'loading' || screen === 'buffering' ? t : null);
 
     // Thumbnail: only while the card is fully visible (bitmaps can't fade).
     const thumb = this.card && fade(this.card.until) >= 1 ? this.thumb.want : null;
@@ -263,6 +284,25 @@ export default class Tv {
       const next = Math.min(...deadlines);
       const wait = next - now > FADE_MS ? next - now - FADE_MS : 120;
       this.timer = setTimeout(() => this.render(), wait);
+    }
+  }
+
+  /** Keeps the loading dots pulsing while `t` is set; clears them otherwise. */
+  #animateDots(t) {
+    this.dotsTheme = t;
+    if (!t) {
+      clearInterval(this.dotsTimer);
+      this.dotsTimer = null;
+      this.#send('dots', null);
+      return;
+    }
+    const tick = () => {
+      const phase = (Date.now() % DOTS_CYCLE_MS) / DOTS_CYCLE_MS;
+      this.#send('dots', screens.dots(this.dotsTheme, phase).join('\n'));
+    };
+    if (!this.dotsTimer) {
+      tick();
+      this.dotsTimer = setInterval(tick, DOTS_MS);
     }
   }
 

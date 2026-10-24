@@ -5,6 +5,7 @@ import { Worker, isMainThread, parentPort, workerData } from 'node:worker_thread
 import zlib from 'node:zlib';
 import { DATA_DIR } from '../config.js';
 import { parseColor } from './ass.js';
+import { CARD } from './screens.js';
 
 /**
  * The home screen's backdrop: a 1920x1080 PNG that mpv shows on its video
@@ -86,7 +87,7 @@ export function painter(spec, w = W, h = H) {
   // Per pixel: vignette factor, card (white) alpha.
   const vig = new Float32Array(n);
   const card = new Float32Array(n);
-  const box = { x: 320 * k, y: 440 * k, w: 1280 * k, h: 222 * k, r: 56 * k };
+  const box = Object.fromEntries(Object.entries(CARD).map(([key, v]) => [key, v * k]));
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = y * w + x;
