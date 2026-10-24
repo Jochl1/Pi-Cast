@@ -13,6 +13,7 @@ import createControls from './controls.js';
 import createWebServer from './web.js';
 import ReceiverStore from './receiverStore.js';
 import Tv from './tv/tv.js';
+import Cec from './cec.js';
 import { themeFor } from './shared/theme.js';
 
 const config = loadConfig();
@@ -109,6 +110,36 @@ const tv = new Tv({
 });
 tv.start();
 
+// --- TV remote (HDMI-CEC) ---
+const cec = new Cec({ name: settings.get().deviceName, log });
+const REMOTE_ACTIONS = {
+  ok: () => controls.toggle(),
+  playpause: () => controls.toggle(),
+  play: () => controls.resume(),
+  pause: () => controls.pause(),
+  stop: () => controls.stop(),
+  back: () => controls.stop(),
+  left: () => controls.seekBy(-10),
+  rewind: () => controls.seekBy(-10),
+  right: () => controls.seekBy(10),
+  fastforward: () => controls.seekBy(10),
+  backward: () => controls.seekBy(-30),
+  forward: () => controls.seekBy(30),
+};
+cec.on('key', (key) => {
+  // The settings panel (and OK on the home screen) come first.
+  if (tv.key(key) || !playback.source) return;
+  Promise.resolve(REMOTE_ACTIONS[key]?.()).catch((e) => log.debug(`remote key ${key} failed:`, e.message));
+});
+playback.on('play', () => {
+  if (settings.get().cecEnabled && settings.get().cecSwitchInput) cec.switchInput();
+});
+settings.on('change', (values, changed) => {
+  if (changed.includes('cecEnabled')) (values.cecEnabled ? cec.start() : cec.stop());
+  else if (changed.includes('deviceName')) cec.restart(values.deviceName);
+});
+if (settings.get().cecEnabled) cec.start();
+
 // --- Start ---
 // Doesn't wait for mpv: it retries in the background if it can't start.
 mpv.start();
@@ -123,6 +154,7 @@ web.listen(config.webPort, () => {
 
 async function shutdown() {
   log.info('shutting down');
+  cec.stop();
   await streamlink.close();
   await cast.stop();
   await mpv.shutdown();

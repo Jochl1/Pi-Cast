@@ -51,7 +51,7 @@ install_packages() {
   say "Installing system packages (this takes a while)"
   sudo apt-get update
   sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
-    mpv ffmpeg python3-venv curl ca-certificates v4l-utils \
+    mpv ffmpeg python3-venv curl ca-certificates cec-utils v4l-utils \
     plymouth plymouth-themes imagemagick librsvg2-bin fontconfig git
 }
 

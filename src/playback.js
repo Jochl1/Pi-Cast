@@ -12,6 +12,7 @@ import { lookup } from './metadata.js';
  *  'takeover' (previousOwner) - someone else started playing
  *  'ended' ({ owner, reason }) - the current item finished ('eof') or failed ('error')
  *  'change' - owner, source or metadata changed
+ *  'play' ({ owner, url, kind }) - a new item was requested
  */
 export default class Playback extends EventEmitter {
   /** `getTwitchQuality` returns the streamlink quality list to use for the next stream. */
@@ -53,6 +54,7 @@ export default class Playback extends EventEmitter {
     const source = { url, kind, title: null, channel: null, thumbnail: null };
     this.source = source;
     if (previous && previous !== owner) this.emit('takeover', previous);
+    this.emit('play', { owner, url, kind });
     this.emit('change');
     this.log.info(`play [${owner}/${kind}] ${url}${start ? ` @${start}s` : ''}`);
 
