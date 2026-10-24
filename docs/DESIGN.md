@@ -264,3 +264,9 @@ The Pi 3 throttles from 1200 to 600 MHz on undervoltage (`vcgencmd get_throttled
 - **Spotify:** pi-cast as a Spotify Connect speaker (librespot, e.g. via raspotify; needs Premium), with the cover, title and progress on the TV. librespot needs the HDMI audio device, which mpv and the sounds helper also want (§4.5). It could hand its audio to mpv through a pipe, or take the device the way the sounds helper does.
 - **Colour key legend:** show what the four colour keys do, e.g. a small row of coloured dots with the favourites' names on the home screen (and in the settings panel). For Twitch favourites it could show who's live right now.
 - **Profiles:** a "Who's watching?" picker at startup, like Netflix, chosen with the arrow keys. Each profile has its own colour keys, accent, Recent list, language and, later, Instagram account.
+- **Weather forecast on the home screen:** today's and the next days' weather next to the clock, from Open-Meteo (free, no key). The location could come from the web app's settings.
+- **AirPlay screen mirroring** from the iPhone, with UxPlay (open-source AirPlay server; GStreamer, hardware H.264 through v4l2). It's an experiment on a Pi 3:
+  - **The display:** UxPlay draws through its own GStreamer sink and needs the display, which mpv holds. So mpv would have to step aside while mirroring (be stopped and started again afterwards, with a black flash), or UxPlay's H.264 would have to be fed to mpv.
+  - **Audio:** it needs the HDMI audio device too (§4.5).
+  - **Limits:** about 0.5 s of delay (fine for photos and web pages, not for games), and Netflix and other DRM apps show black.
+  - Test UxPlay on its own first, at the throttled 600 MHz.
