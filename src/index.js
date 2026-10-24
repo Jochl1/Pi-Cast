@@ -112,6 +112,13 @@ function restartMpvWhenIdle() {
 playback.on('change', () => {
   if (mpvRestartPending) restartMpvWhenIdle();
 });
+// The Pi 3 can't fit the overlays and then draws none of them until mpv
+// restarts (DESIGN §4.2). Log what was on screen, and restart once idle.
+mpv.on('log', (text) => {
+  if (!text.includes('OSD bitmaps do not fit') || mpvRestartPending) return;
+  log.warn(`overlays didn't fit (screen ${tv.screen()}: ${tv.layerSummary()}); restarting mpv when idle`);
+  restartMpvWhenIdle();
+});
 
 settings.on('change', (values, changed) => {
   log.info('settings changed:', changed.join(', '));

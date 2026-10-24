@@ -1,13 +1,14 @@
 import { execFile } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
+import net from 'node:net';
 import path from 'node:path';
 import { DATA_DIR } from './config.js';
 
 const PIPE = '/tmp/shairport-sync-metadata';
 const COVER_DIR = path.join(DATA_DIR, 'airplay');
 const RATE = 44100; // AirPlay's RTP clock
-const REOPEN_MS = 3000;
+const RETRY_MS = 3000;
 
 /**
  * AirPlay audio through shairport-sync, which plays on its own; this reads
@@ -37,16 +38,25 @@ export default class AirPlay extends EventEmitter {
     this.#open();
   }
 
+  /**
+   * Opens the FIFO read-write and non-blocking, read through a socket: never
+   * EOF when shairport-sync closes its end, and no blocked read in libuv's
+   * thread pool (fs.createReadStream's), which kept Node from exiting.
+   */
   #open() {
-    if (!fs.existsSync(PIPE)) {
-      setTimeout(() => this.#open(), REOPEN_MS).unref();
+    let fd;
+    try {
+      fd = fs.openSync(PIPE, fs.constants.O_RDWR | fs.constants.O_NONBLOCK);
+    } catch {
+      setTimeout(() => this.#open(), RETRY_MS).unref(); // shairport-sync makes it on start
       return;
     }
-    // A FIFO reads to EOF whenever shairport-sync closes its end; open it again then.
-    const stream = fs.createReadStream(PIPE, { encoding: 'utf8' });
-    stream.on('data', (d) => this.#onData(d));
-    stream.on('error', (e) => this.log.debug('AirPlay metadata pipe:', e.message));
-    stream.on('close', () => setTimeout(() => this.#open(), 200).unref());
+    const pipe = new net.Socket({ fd, readable: true, writable: false });
+    pipe.setEncoding('utf8');
+    pipe.unref();
+    pipe.on('data', (d) => this.#onData(d));
+    pipe.on('error', (e) => this.log.debug('AirPlay metadata pipe:', e.message));
+    pipe.on('close', () => setTimeout(() => this.#open(), RETRY_MS).unref());
   }
 
   #onData(chunk) {

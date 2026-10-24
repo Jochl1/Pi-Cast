@@ -399,6 +399,12 @@ export default class Tv {
     }
   }
 
+  /** What's drawn now, layer by layer, for the log: "home 41 events 9 kB, toast 2 events 0 kB". */
+  layerSummary() {
+    return Object.entries(this.sent).filter(([name, data]) => LAYERS[name] && data)
+      .map(([name, data]) => `${name} ${data.split('\n').length} events ${Math.round(data.length / 1024)} kB`).join(', ') || 'none';
+  }
+
   async #send(name, data) {
     if (this.sent[name] === data) return;
     const { id, z } = LAYERS[name];
