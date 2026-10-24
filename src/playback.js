@@ -46,6 +46,8 @@ export default class Playback extends EventEmitter {
     // mpv and its playlist entry; `showing` while that's mpv's current file;
     // `failed` = a file that didn't open.
     this.background = { file: null, loaded: null, id: null, showing: false, failed: null };
+    // While the TV is off the backdrop stays loaded but paused, so it's there the moment the TV is back.
+    this.standby = false;
 
     mpv.on('ready', () => {
       // A (re)started mpv is idle.
@@ -97,6 +99,13 @@ export default class Playback extends EventEmitter {
     if (!this.source) this.#toIdle();
   }
 
+  /** TV off: the backdrop holds still. The caller stops playback. */
+  setStandby(on) {
+    if (this.standby === on) return;
+    this.standby = on;
+    if (!this.source) this.#toIdle();
+  }
+
   /** Shows the backdrop, or stops mpv if there's none. */
   async #toIdle() {
     if (!this.mpv.socket) return; // done again on 'ready'
@@ -113,12 +122,14 @@ export default class Playback extends EventEmitter {
     const { file } = bg;
     if (!file || bg.failed === file) return false;
     if (bg.showing && bg.loaded === file) {
-      if (this.mpv.props.pause) await this.mpv.resume(); // paused by play()
+      // Paused by play() (or for standby).
+      if (!!this.mpv.props.pause !== this.standby) await this.mpv.set('pause', this.standby);
       return true;
     }
     await this.mpv.set('image-display-duration', 'inf');
     const id = await this.mpv.load(file, { loop: true, audio: false });
     Object.assign(bg, { loaded: file, id });
+    if (this.standby) await this.mpv.pause(); // its first frame still shows
     return true;
   }
 

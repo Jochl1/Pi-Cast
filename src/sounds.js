@@ -52,12 +52,23 @@ export default class Sounds {
     this.endsAt = Date.now() + ((fs.statSync(file).size - 44) / 192000) * 1000;
   }
 
+  /** Plays the startup sound as soon as the device is free (e.g. when the TV comes back on). */
+  startup() {
+    this.startupPending = true;
+    if (this.held && !this.busy) {
+      this.startupPending = false;
+      this.play('startup');
+    }
+  }
+
   /** True while the device may be held: nothing playing and mpv's audio closed. */
   #free() {
     return !this.playback.source && !this.mpv.props['current-ao'];
   }
 
   #update() {
+    // Once something plays, the startup sound's moment has passed.
+    if (this.playback.source) this.startupPending = false;
     if (!this.proc || this.busy) return;
     if (this.#free() && !this.held) this.#open();
     else if (!this.#free() && this.held) this.#release();

@@ -51,7 +51,7 @@ Pi-Cast picks them up the next time it starts or the accent changes, while "Anim
 1. Open **http://picast.local:8080** in Safari, or scan the QR code on the TV's home screen with the camera.
 2. Tap **Share → Add to Home Screen**.
 
-You get the remote (play/pause, ±10 s, volume, "Play a link", Recent) and all settings (accent color, animations, sounds, language (English/German), device name, Twitch quality, SponsorBlock, clock, TV remote options).
+You get the remote (play/pause, ±10 s, volume, "Play a link", Recent) and all settings (accent color, animations, sounds, language (English/German), device name, Twitch quality, SponsorBlock, clock, TV remote options, including sleeping while the TV is off).
 
 ### "Send to Pi-Cast" in the share sheet
 

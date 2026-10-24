@@ -15,6 +15,11 @@ const UI_CODES = {
 // The TV repeats a code while a key is held; toggles must not flip back and forth.
 const NO_REPEAT = new Set(['ok', 'play', 'pause', 'playpause', 'stop', 'back', 'red', 'green', 'yellow', 'blue']);
 const REPEAT_GAP_MS = 350;
+// The DYON TV doesn't announce standby, so its power status is asked for.
+// More often while it's off, so waking up is quick.
+const POWER_POLL_MS = { on: 10000, standby: 3000 };
+// REPORT_POWER_STATUS (0x90) values; the transitions count as where they're heading.
+const POWER = { 0: 'on', 1: 'standby', 2: 'on', 3: 'standby' };
 
 /**
  * Key name from a cec-client traffic line, or null. Received USER_CONTROL_PRESSED
@@ -26,12 +31,27 @@ export function parseKey(line) {
 }
 
 /**
+ * 'on' | 'standby' | null from a cec-client line: a received REPORT_POWER_STATUS
+ * ("TRAFFIC: ... >> 04:90:01"), or cec-client's answer to `pow 0` ("power status: on").
+ * That answer often comes from libcec's cache without asking the TV, but the
+ * cache flips to on as soon as the TV shows up on the bus again.
+ */
+export function parsePower(line) {
+  const m = line.match(/>>\s+0[0-9a-f]:90:([0-9a-f]{2})/i);
+  if (m) return POWER[parseInt(m[1], 16)] ?? null;
+  const s = line.match(/^power status: (.+)$/i)?.[1].trim();
+  if (s === 'on' || s === 'in transition from standby to on') return 'on';
+  if (s === 'standby' || s === 'in transition from on to standby') return 'standby';
+  return null;
+}
+
+/**
  * TV remote over HDMI-CEC, using libcec's cec-client. It registers as a
  * playback device and answers the TV's protocol questions (power status,
  * menu state, ...), which many TVs need before they forward remote keys.
  * We read key presses from its traffic log and send commands on stdin.
  *
- * Events: 'key' (name)
+ * Events: 'key' (name), 'power' ('on' | 'standby': the TV's power status, when it changes)
  */
 export default class Cec extends EventEmitter {
   constructor({ name, log, path = 'cec-client' }) {
@@ -41,6 +61,8 @@ export default class Cec extends EventEmitter {
     this.enabled = false;
     this.restartDelay = 5000;
     this.lastKey = { name: null, at: 0 };
+    this.power = null; // the TV's, as last reported
+    this.pollTimer = null;
   }
 
   start() {
@@ -76,10 +98,25 @@ export default class Cec extends EventEmitter {
       this.restartDelay = Math.min(this.restartDelay * 2, 300000);
     });
     this.log.info('HDMI-CEC started');
+    this.#pollPower();
+  }
+
+  #pollPower() {
+    clearTimeout(this.pollTimer);
+    this.pollTimer = setTimeout(() => {
+      this.#askPower();
+      this.#pollPower();
+    }, POWER_POLL_MS[this.power] ?? POWER_POLL_MS.on);
+  }
+
+  #askPower() {
+    this.proc?.stdin.write('pow 0\n');
   }
 
   stop() {
     this.enabled = false;
+    clearTimeout(this.pollTimer);
+    this.power = null;
     const proc = this.proc;
     this.proc = null;
     if (proc) {
@@ -107,6 +144,15 @@ export default class Cec extends EventEmitter {
   #onLine(line) {
     if (line.includes('connection opened')) this.restartDelay = 5000;
     if (/ERROR|could not|failed/i.test(line)) this.log.debug('[cec]', line.trim());
+    // The TV announces its address when it turns on: ask right away instead of on the next poll.
+    if (/>>\s+0f:84:00:00/i.test(line)) this.#askPower();
+    const power = parsePower(line);
+    if (power && power !== this.power) {
+      this.power = power;
+      this.log.info(`HDMI-CEC: TV is ${power}`);
+      this.emit('power', power);
+      this.#pollPower();
+    }
     const name = parseKey(line);
     if (!name) return;
     const now = Date.now();

@@ -166,7 +166,18 @@ cec.on('key', (key) => {
 playback.on('play', () => {
   if (settings.get().cecEnabled && settings.get().cecSwitchInput) cec.switchInput();
 });
+// TV off: stop, and the home screen holds still. TV on: it moves again, with the startup sound.
+function setStandby(on) {
+  if (on === playback.standby) return;
+  log.info(on ? 'TV is off: standby' : 'TV is on: waking up');
+  playback.setStandby(on); // first, so stopping brings the backdrop back paused
+  if (on) playback.stop().catch((e) => log.warn('stopping for standby failed:', e.message));
+  // Not when the TV was woken by a cast: the video is already on its way.
+  if (!on && !playback.source) sounds.startup();
+}
+cec.on('power', (power) => setStandby(power === 'standby' && settings.get().cecStandby));
 settings.on('change', (values, changed) => {
+  if (changed.includes('cecStandby') && !values.cecStandby) setStandby(false);
   if (changed.includes('cecEnabled')) (values.cecEnabled ? cec.start() : cec.stop());
   else if (changed.includes('deviceName')) cec.restart(values.deviceName);
 });

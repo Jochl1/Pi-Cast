@@ -36,6 +36,8 @@ const SCHEMA = {
   twitchQuality: { def: '720p60', ok: (v) => TWITCH_QUALITIES.includes(v) },
   cecEnabled: { def: true, ok: bool },
   cecSwitchInput: { def: true, ok: bool },
+  // Stop and go dark while the TV is off; startup sound when it's back.
+  cecStandby: { def: true, ok: bool },
 };
 
 /**

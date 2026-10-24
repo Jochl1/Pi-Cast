@@ -155,6 +155,11 @@ streamlink with `--player-external-http` on `127.0.0.1`; Pi-Cast waits for its U
 - Keys are parsed from its traffic log (`>> 04:44:xx`, USER_CONTROL_PRESSED), and held-key repeats are suppressed for toggles.
 - "Switch TV input on cast" sends image-view-on and active-source when playback starts. If the TV doesn't respond, Pi-Cast logs it and carries on.
 - Arrow-key passthrough varies by TV, so every TV setting is also in the web app.
+- **Standby with the TV** ("Sleep when the TV is off", `cecStandby`): the DYON sends no STANDBY (`0x36`) when it turns off, so Pi-Cast sends `pow 0` every 10 s (3 s while the TV is off). It reads both the TV's real REPORT_POWER_STATUS (`>> 04:90:xx`) and cec-client's `power status:` answer.
+  - That answer usually comes from libcec's cache, which only asks the TV about every 30 s, so noticing "off" takes up to ~30 s. The cache flips to on as soon as the TV reappears on the bus (`0f:84`, `0f:86`), so waking is seen within the 3 s poll. Reading only the real replies made waking take ~20 s.
+  - TV off: playback stops and the home backdrop stays loaded but paused (`Playback.setStandby`), so the picture is there the instant the TV is back. TV on: the backdrop moves again and the startup sound plays, unless the TV was woken by a cast.
+  - The HDMI connector stays `connected` while the TV is off, so hotplug can't be used.
+  - The Pi can't power itself off and on (a Pi 3 only boots again on power), so this is the closest to "off with the TV".
 - **Colour keys** (F1–F4: `0x71` blue, `0x72` red, `0x73` green, `0x74` yellow on the DYON) play the favourite in the `shortcuts` setting, on any screen, through `Playback.play` with owner `'web'` (so a cast session gets the usual takeover). An empty key shows a toast.
 - **Number keys aren't forwarded by the DYON TV**, tested both as a playback device (`-t p`) and as a recorder (`-t r`) with Pi-Cast as the active source. Only OK came through. That's why favourites are on the colour keys and not on digit codes.
 
@@ -171,7 +176,7 @@ streamlink with `--player-external-http` on `127.0.0.1`; Pi-Cast waits for its U
 - `bin/sounds.py` plays them through libasound (ctypes, standard library only), on mpv's ALSA device behind `plug:`. While it holds the device it writes silence between sounds (10 ms writes, 60 ms latency), so the TV keeps its audio input awake and short sounds aren't swallowed.
 - The device takes one program at a time (§4.5), so the helper holds it only while nothing plays and mpv's `current-ao` is unset. `mpv.load()` awaits `beforeLoad` for anything but the backdrop: the helper lets go first, after letting a sound that's still playing finish (at most 1 s). After a stop, mpv closes its audio output once the backdrop (which has no audio) shows, and the helper takes the device back.
 - So there are no UI sounds during a video or over a paused one.
-- Triggers: the settings panel (open, move, select, close) and toasts (notify; error for "Couldn't play" and unset colour keys). The startup sound plays the first time the helper gets the device, if the app started within 5 minutes of boot.
+- Triggers: the settings panel (open, move, select, close) and toasts (notify; error for "Couldn't play" and unset colour keys). The startup sound plays the first time the helper gets the device if the app started within 5 minutes of boot, and when the TV comes back on (see CEC). It's dropped once something plays.
 
 ### Settings side effects
 
@@ -185,7 +190,7 @@ streamlink with `--player-external-http` on `127.0.0.1`; Pi-Cast waits for its U
 | Clock | Redraw the home screen. |
 | Sounds | UI sounds and the startup sound on/off (checked when a sound would play). |
 | Language | Redraw the overlays, re-label the web app, regenerate the boot splash ("STARTING UP" / "WIRD GESTARTET"). |
-| CEC toggles | Start or stop CEC; switch the input on cast. |
+| CEC toggles | Start or stop CEC; switch the input on cast; standby with the TV (turning it off wakes up). |
 
 ### Boot and install
 
