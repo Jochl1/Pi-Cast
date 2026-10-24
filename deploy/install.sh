@@ -45,6 +45,46 @@ check_system() {
     || die "Needs Raspberry Pi OS, found ${PRETTY_NAME:-unknown}."
   (( ${VERSION_ID:-0} >= 12 )) || die "Needs Raspberry Pi OS Bookworm (12) or newer, found ${PRETTY_NAME:-unknown}."
   sudo -v || die "sudo is required."
+  check_power before
+}
+
+# Undervoltage corrupts SD card writes, and the install writes a lot.
+# vcgencmd get_throttled: bit 0 = undervolted now, bit 16 = since boot.
+check_power() {
+  local when="$1" t
+  command -v vcgencmd >/dev/null || return 0
+  t="$(vcgencmd get_throttled 2>/dev/null | cut -d= -f2)"
+  [[ "$t" == 0x* ]] || return 0
+  (( (t & 0x10001) == 0 )) && return 0
+  if [[ "$when" == before ]]; then
+    [[ "${PICAST_IGNORE_POWER:-}" == 1 ]] && { warn "Undervoltage detected ($t), continuing anyway."; return 0; }
+    die "The Pi reports undervoltage (throttled=$t). Writing to the SD card like this can corrupt it.
+   Use a 5 V / 2.5 A power supply with a short cable, reboot, and run the installer again.
+   To install anyway: PICAST_IGNORE_POWER=1 ./deploy/install.sh"
+  fi
+  warn "The Pi reported undervoltage during the install (throttled=$t). Get a better power supply soon."
+}
+
+# Checks that the kernel and initramfs the firmware boots from match the
+# packaged copies, so a damaged SD card shows up now instead of as a Pi that
+# no longer boots (green LED blinking 7 times).
+verify_boot_files() {
+  local fw=/boot/firmware kver
+  [[ -d "$fw" ]] || fw=/boot
+  kver="$(uname -r)"
+  say "Checking the boot files"
+  sync
+  sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches' # read back from the card, not the cache
+  if [[ -f "$fw/kernel8.img" && -f "/boot/vmlinuz-$kver" ]] \
+    && ! sudo cmp -s "$fw/kernel8.img" "/boot/vmlinuz-$kver"; then
+    die "$fw/kernel8.img is damaged. Don't reboot yet: the Pi wouldn't start.
+   Try once: sudo cp /boot/vmlinuz-$kver $fw/kernel8.img && sync
+   then run the installer again. If it fails again, the SD card is faulty; replace it."
+  fi
+  if [[ -f "$fw/initramfs8" && -f "/boot/initrd.img-$kver" ]] \
+    && ! sudo cmp -s "$fw/initramfs8" "/boot/initrd.img-$kver"; then
+    warn "$fw/initramfs8 differs from /boot/initrd.img-$kver. If the Pi doesn't boot, copy it over."
+  fi
 }
 
 install_packages() {
@@ -242,13 +282,17 @@ EOF
 finish() {
   local host
   host="$(hostname)"
+  sudo apt-get clean # frees a few hundred MB on the card
+  check_power after
   say "Done"
   cat <<EOF
 
-  Reboot now:            sudo reboot
+  Reboot now:            sudo reboot   (don't just unplug it)
   Then on your iPhone:   http://$host.local:8080
-  Cast from YouTube:     tap Cast → $(node -p "require('$REPO/src/../package.json') && 'Pi-Cast'")
+  Cast from YouTube:     tap Cast → Pi-Cast
   Logs:                  journalctl -u picast -f
+
+  TV black but showing a signal? Turn the TV off and on once.
 
 EOF
 }
@@ -264,4 +308,5 @@ install_services
 disable_wifi_powersave
 install_boot_splash
 configure_boot
+verify_boot_files
 finish

@@ -103,6 +103,9 @@ Settings from the web app are stored in `data/settings.json`. Lower-level option
 
 ## Troubleshooting
 
+- **Installer stops with "undervoltage":** the power supply is too weak, and writing to the SD card on low voltage corrupts it. Use a 5 V / 2.5 A supply with a short cable. `PICAST_IGNORE_POWER=1 ./deploy/install.sh` skips the check.
+- **Pi doesn't boot, green LED blinks 7 times:** the kernel on the SD card is damaged. The installer checks this before you reboot. If it happens anyway, the SD card is usually faulty.
+- **TV black but showing a signal:** turn the TV off and on once.
 - **Logs:** `journalctl -u picast -f`. Use `"logLevel": "debug"` for mpv/streamlink/CEC details.
 - **Stuttering video:** check the CPU with `htop` while a video plays. With `v4l2m2m-copy` or `drm`, mpv should stay well under 100 %. If it's high, hardware decoding isn't working. Try the other `mpvHwdec` value. Videos are capped at 1080p30 H.264. 1080p60 is too much for a Pi 3.
 - **YouTube stopped working:** update yt-dlp now instead of waiting for the daily timer: `sudo systemctl start picast-update`.

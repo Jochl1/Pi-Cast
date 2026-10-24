@@ -48,6 +48,9 @@ export default class Cec extends EventEmitter {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     this.proc = proc;
+    // Writing to a cec-client that just died raises EPIPE here; without a
+    // handler that would crash the whole app. 'exit' handles the restart.
+    proc.stdin.on('error', (e) => this.log.debug('[cec] stdin:', e.message));
     let buffer = '';
     proc.stdout.on('data', (chunk) => {
       buffer += chunk.toString();
