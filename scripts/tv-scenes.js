@@ -11,6 +11,7 @@ function qrModules(url) {
   const { modules } = QRCode.create(url, { errorCorrectionLevel: 'M' });
   return Array.from({ length: modules.size }, (_, r) => Array.from({ length: modules.size }, (_, c) => !!modules.get(r, c)));
 }
+const de = { ...base, language: 'de' };
 const now = new Date(2026, 9, 24, 21, 34);
 const homeState = {
   now, clock24: true, net: { kind: 'wifi', ssid: 'Home', signal: 70 },
@@ -54,6 +55,21 @@ export const scenes = {
       screens.settingsPanel(t, { settings: base, focus: 2, swatches })],
   },
   toast: { settings: base, video: true, layers: (t) => [screens.toast(t, toastText)] },
+  // German: the longest texts.
+  'home-de': { settings: de, layers: (t) => [screens.home(t, homeState)] },
+  'loading-de': {
+    settings: de,
+    layers: (t) => [screens.home(t, { ...homeState, loading: { ...video, sender: 'iPhone' } }), screens.dots(t, 0.3)],
+  },
+  'playing-de': {
+    settings: de, video: true,
+    layers: (t) => [screens.nowPlaying(t, { ...video, quality: '1080p', withThumb: true }), screens.senderPill(t, 'iPhone von Johann')],
+  },
+  'settings-de+toast': {
+    settings: de,
+    layers: (t) => [screens.home(t, { ...homeState, panelOpen: true }),
+      screens.settingsPanel(t, { settings: de, focus: 1, swatches }), screens.toast(t, t.tr('couldntPlay'))],
+  },
   // Worst cases: the biggest screens with a toast on top.
   'buffering+popup+toast': {
     settings: base, video: true,

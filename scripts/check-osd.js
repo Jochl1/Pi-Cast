@@ -5,7 +5,7 @@
 //   sudo systemctl stop picast && node scripts/check-osd.js; sudo systemctl start picast
 import { loadConfig } from '../src/config.js';
 import Mpv from '../src/mpv.js';
-import { themeFor } from '../src/shared/theme.js';
+import { look } from '../src/tv/screens.js';
 import { scenes } from './tv-scenes.js';
 
 const quiet = { error() {}, warn() {}, info() {}, debug() {} };
@@ -19,7 +19,7 @@ for (const [name, scene] of Object.entries(scenes)) {
   const errors = [];
   mpv.on('log', (text) => errors.push(text));
   await mpv.start();
-  const layers = scene.layers(themeFor(scene.settings));
+  const layers = scene.layers(look(scene.settings));
   for (const [i, events] of layers.entries()) {
     await mpv.showOverlay(events.join('\n'), { id: i + 1, z: i });
   }

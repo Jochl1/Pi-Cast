@@ -4,13 +4,14 @@ import path from 'node:path';
 import { ROOT, DATA_DIR } from './config.js';
 import { svgToPng, xml } from './render.js';
 import { themeFor } from './shared/theme.js';
+import { translator } from './shared/i18n.js';
 import { parseColor } from './tv/ass.js';
 
 export const SPLASH_DIR = path.join(DATA_DIR, 'plymouth');
 // Installed by deploy/install.sh; copies SPLASH_DIR into the Plymouth theme
 // and rebuilds the initramfs. Allowed via a sudoers rule for this one command.
 const UPDATE_HELPER = '/usr/local/sbin/picast-plymouth-update';
-const SPLASH_KEYS = ['accent', 'customAccent', 'bootAnimation'];
+const SPLASH_KEYS = ['accent', 'customAccent', 'bootAnimation', 'language'];
 
 const svg = (w, h, body) => `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${body}</svg>`;
 
@@ -37,7 +38,7 @@ export async function buildSplash(settings, outDir = SPLASH_DIR) {
     return `<circle cx="${cx}" cy="9" r="9" fill="rgb(${r},${g},${b})" fill-opacity="${a}"/>`;
   }).join('')));
   await put('status.png', svg(360, 48, `<text x="180" y="36" text-anchor="middle" font-family="Sora"
-    font-size="33" letter-spacing="2.6" fill="${t.muted}">${xml('STARTING UP')}</text>`));
+    font-size="33" letter-spacing="2.6" fill="${t.muted}">${xml(translator(settings.language)('startingUp'))}</text>`));
   await put('glow-a.png', glowSvg(1080, t.accent, 0.45));
   await put('glow-b.png', glowSvg(990, t.accent, 0.30));
 

@@ -1,3 +1,5 @@
+import { themeFor } from '../shared/theme.js';
+import { LANGUAGES, translator } from '../shared/i18n.js';
 import {
   text, span, rect, circle, arcBand, escape, fit, textWidth, qrShape,
 } from './ass.js';
@@ -8,8 +10,12 @@ import {
  *
  * mpv packs all overlays into one texture, which the Pi 3's GPU caps at
  * 2048x2048; if they don't fit, nothing is drawn. So no full-screen shapes
- * behind the home screen (its color is mpv's background-color, see Tv) and
- * no big blurred glows. Run scripts/check-osd.js on the Pi after changes.
+ * behind the home screen (its backdrop is a picture mpv plays, see
+ * background.js) and no big blurred glows. Run scripts/check-osd.js on the
+ * Pi after changes.
+ *
+ * `t` is a look(): the theme's colors plus `tr`, the translator for the
+ * language setting.
  */
 
 export const W = 1920;
@@ -18,7 +24,11 @@ const PAD_X = 96;
 const PAD_Y = 84;
 // Colors used over video, from the design.
 const ON_VIDEO = { text: '#F2F4F7', muted: '#B4BCC8', track: 'rgba(255,255,255,0.2)', dim: 'rgba(6,8,12,0.62)' };
-const SOURCE = { youtube: 'YouTube', twitch: 'Twitch', generic: 'Link' };
+const SOURCE = { youtube: 'YouTube', twitch: 'Twitch' };
+const source = (t, kind) => SOURCE[kind] ?? t.tr('link');
+
+/** Colors and texts for `settings`: themeFor() plus tr (see i18n.js). */
+export const look = (settings) => ({ ...themeFor(settings), tr: translator(settings.language) });
 
 /** "pi·cast" with the dot in the accent color; `color` is the rest of the word. */
 const wordmark = (t, color = t.text, opacity = 1) => `pi${span('·', t.accent, opacity)}${span('cast', color, opacity)}`;
@@ -31,8 +41,8 @@ export function fmtTime(sec) {
   return h ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
 }
 
-function clockParts(now, clock24) {
-  const date = `${now.toLocaleDateString('en-GB', { weekday: 'long' })}, ${now.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}`;
+function clockParts(now, clock24, locale) {
+  const date = `${now.toLocaleDateString(locale, { weekday: 'long' })}, ${now.toLocaleDateString(locale, { day: 'numeric', month: 'long' })}`;
   const h = now.getHours();
   const mm = String(now.getMinutes()).padStart(2, '0');
   if (clock24) return { time: `${String(h).padStart(2, '0')}:${mm}`, suffix: '', date };
@@ -40,7 +50,7 @@ function clockParts(now, clock24) {
 }
 
 function clock(t, now, clock24, opacity = 1) {
-  const c = clockParts(now, clock24);
+  const c = clockParts(now, clock24, t.tr.locale);
   const events = [
     text(c.time + (c.suffix ? `{\\fsp0\\fs${Math.round(48 * 1.54)}}\\h${c.suffix}` : ''),
       { x: PAD_X, y: PAD_Y - 53, px: 156, weight: 600, spacing: -4.7, color: t.text, opacity }),
@@ -61,16 +71,16 @@ function wifiIcon(x, y, color, active, bars) {
 }
 
 function network(t, net) {
-  let label = 'Network';
+  let label = t.tr('network');
   let bars = 3;
   let active = true;
   if (net?.kind === 'wifi') {
     label = net.ssid ? `Wi-Fi · ${net.ssid}` : 'Wi-Fi';
     if (net.signal != null) bars = net.signal > 66 ? 3 : net.signal > 33 ? 2 : 1;
   } else if (net?.kind === 'wired') {
-    label = 'Ethernet';
+    label = t.tr('ethernet');
   } else if (net?.kind === 'offline') {
-    label = 'Offline';
+    label = t.tr('offline');
     active = false;
   }
   label = fit(label, 36, 600);
@@ -105,9 +115,9 @@ function bottomBar(t, { pairingCode, remote, qr }) {
   const value = (s, x) => text(escape(s), { x, y: valueY, px: 45, font: 'JetBrains Mono', weight: 500, color: t.text });
   const events = [
     rect(PAD_X, lineY, W - 2 * PAD_X, 3, { color: t.line }),
-    label('TV CODE', PAD_X),
+    label(t.tr('tvCode'), PAD_X),
     value(pairingCode ?? '—', PAD_X),
-    label('REMOTE', remoteX),
+    label(t.tr('remote'), remoteX),
     value(remote, remoteX),
     text(wordmark(t, t.muted), { x: W - PAD_X, y: 996, an: 3, px: 39, weight: 600, color: t.muted }),
   ];
@@ -118,8 +128,8 @@ function bottomBar(t, { pairingCode, remote, qr }) {
     const mid = lineY + 24 + tile.size / 2;
     events.push(
       ...tile.events,
-      text('Scan with your', { x: x + tile.size + 30, y: mid - 4, an: 1, px: 30, color: t.muted }),
-      text('phone camera', { x: x + tile.size + 30, y: mid + 4, an: 7, px: 30, color: t.muted }),
+      text(t.tr('scanLine1'), { x: x + tile.size + 30, y: mid - 4, an: 1, px: 30, color: t.muted }),
+      text(t.tr('scanLine2'), { x: x + tile.size + 30, y: mid + 4, an: 7, px: 30, color: t.muted }),
     );
   }
   return events;
@@ -132,11 +142,11 @@ export function home(t, { now, clock24, net, pairingCode, remote, qr, deviceName
   const events = [...clock(t, now, clock24), ...network(t, net), ...bottomBar(t, { pairingCode, remote, qr })];
   if (loading) {
     // The backdrop image already has the glass card.
-    events.push(...loadingText(t, 'LOADING', loading));
+    events.push(...loadingText(t, 'loading', loading));
   } else {
     events.push(
-      text('Ready to cast', { x: W / 2, y: 452, an: 8, px: 78, weight: 600, spacing: -0.8, color: t.text }),
-      text(escape(`Open YouTube on your phone and tap Cast → ${deviceName}`), { x: W / 2, y: 560, an: 8, px: 39, color: t.muted }),
+      text(escape(fit(t.tr('readyToCast'), 78, CARD.w - 80, 0.5)), { x: W / 2, y: 452, an: 8, px: 78, weight: 600, spacing: -0.8, color: t.text }),
+      text(escape(fit(t.tr('castHint', { name: deviceName }), 39, CARD.w - 80)), { x: W / 2, y: 560, an: 8, px: 39, color: t.muted }),
     );
   }
   return events;
@@ -146,13 +156,16 @@ export function home(t, { now, clock24, net, pairingCode, remote, qr, deviceName
 export const CARD = { x: 320, y: 440, w: 1280, h: 222, r: 56 };
 const DOTS_Y = CARD.y + CARD.h + 64;
 
-/** Label, title and source line of the loading card. `item` = { title, channel, kind, sender }. */
+/**
+ * Label, title and source line of the loading card. `label` is 'loading' or
+ * 'buffering'; `item` = { title, channel, kind, sender }.
+ */
 function loadingText(t, label, item, onVideo = false) {
-  const sub = [item.channel, SOURCE[item.kind], item.sender && `from ${item.sender}`].filter(Boolean).join(' · ');
+  const sub = [item.channel, source(t, item.kind), item.sender && t.tr('from', { name: item.sender })].filter(Boolean).join(' · ');
   const color = onVideo ? ON_VIDEO : t;
   return [
-    text(label, { x: W / 2, y: CARD.y + 34, an: 8, px: 30, weight: 600, spacing: 3.6, color: t.accent }),
-    text(escape(fit(item.title || 'Getting the video ready', 54, CARD.w - 120, 0.5)), {
+    text(t.tr(label), { x: W / 2, y: CARD.y + 34, an: 8, px: 30, weight: 600, spacing: 3.6, color: t.accent }),
+    text(escape(fit(item.title || t.tr('gettingReady'), 54, CARD.w - 120, 0.5)), {
       x: W / 2, y: CARD.y + 76, an: 8, px: 54, weight: 600, color: color.text,
     }),
     text(escape(fit(sub, 36, CARD.w - 120)), { x: W / 2, y: CARD.y + 158, an: 8, px: 36, color: color.muted }),
@@ -161,7 +174,7 @@ function loadingText(t, label, item, onVideo = false) {
 
 /**
  * Loading card over a video: dimmed video and a glass card like the
- * backdrop's. `label` is 'LOADING' (the next video starts) or 'BUFFERING'.
+ * backdrop's. `label` is 'loading' (the next video starts) or 'buffering'.
  */
 export function loadingOverVideo(t, label, item) {
   return [
@@ -187,7 +200,7 @@ export function dots(t, phase, cx = W / 2, cy = DOTS_Y) {
 
 /** "<sender> connected" pill, top right. */
 export function senderPill(t, name, opacity = 1) {
-  const label = escape(fit(`${name} connected`, 36, 700));
+  const label = escape(fit(t.tr('connected', { name }), 36, 700));
   const h = 96;
   const w = 42 + 24 + 24 + textWidth(label, 36, 0.56) + 42;
   const x = W - 54 - w;
@@ -210,15 +223,15 @@ export function nowPlaying(t, { title, kind, quality, position, duration, live, 
   const L = cardLayout(withThumb);
   const textX = withThumb ? L.x + 36 + 288 + 42 : L.x + 54;
   const maxText = 1260 - (textX - L.x) - 54;
-  const titleText = fit(title || 'Playing', 45, maxText, 0.5);
-  const sub = [SOURCE[kind] ?? 'Link', 'Ad-free', quality].filter(Boolean).join(' · ');
-  const textW = Math.min(maxText, Math.max(textWidth(titleText, 45, 0.5), textWidth(sub, 33), textWidth('NOW PLAYING', 30, 0.75)));
+  const titleText = fit(title || t.tr('playing'), 45, maxText, 0.5);
+  const sub = [source(t, kind), t.tr('adFree'), quality].filter(Boolean).join(' · ');
+  const textW = Math.min(maxText, Math.max(textWidth(titleText, 45, 0.5), textWidth(sub, 33), textWidth(t.tr('nowPlaying'), 30, 0.75)));
   const w = textX - L.x + textW + 54;
   const midY = L.y + L.h / 2;
 
   const events = [
     rect(L.x, L.y, w, L.h, { color: t.glass, opacity, radius: t.radius * 3 }),
-    text('NOW PLAYING', { x: textX, y: midY - 74, px: 30, weight: 600, spacing: 3.6, color: t.accent, opacity }),
+    text(t.tr('nowPlaying'), { x: textX, y: midY - 74, px: 30, weight: 600, spacing: 3.6, color: t.accent, opacity }),
     text(escape(titleText), { x: textX, y: midY - 30, px: 45, weight: 600, color: ON_VIDEO.text, opacity }),
     text(escape(sub), { x: textX, y: midY + 34, px: 33, color: ON_VIDEO.muted, opacity }),
   ];
@@ -238,35 +251,37 @@ export function paused(t, { title, channel, kind, position, duration, live }) {
   const width = W - 2 * PAD_X;
   const barY = 924;
   const frac = live ? 1 : duration ? Math.min(1, position / duration) : 0;
-  const sub = [channel, SOURCE[kind]].filter(Boolean).join(' · ');
+  const sub = [channel, source(t, kind)].filter(Boolean).join(' · ');
   const events = [
     rect(0, 0, W, H, { color: ON_VIDEO.dim }),
     circle(W / 2, H / 2, 102, { color: t.accent, opacity: 0, border: 6, borderColor: t.accent }),
     rect(W / 2 - 12 - 18, H / 2 - 36, 18, 72, { color: t.accent, radius: 6 }),
     rect(W / 2 + 12, H / 2 - 36, 18, 72, { color: t.accent, radius: 6 }),
-    text(escape(fit(title || 'Paused', 60, width, 0.5)), { x: left, y: barY - 156, px: 60, weight: 600, color: ON_VIDEO.text }),
+    text(escape(fit(title || t.tr('paused'), 60, width, 0.5)), { x: left, y: barY - 156, px: 60, weight: 600, color: ON_VIDEO.text }),
     text(escape(fit(sub, 36, width)), { x: left, y: barY - 72, px: 36, color: ON_VIDEO.muted }),
     rect(left, barY, width, 12, { color: ON_VIDEO.track, radius: 6 }),
   ];
   if (frac > 0) events.push(rect(left, barY, Math.max(12, width * frac), 12, { color: t.accent, radius: 6, opacity: live ? 0.5 : 1 }));
   const time = (s, x, an) => text(s, { x, y: barY + 36, an, px: 33, font: 'JetBrains Mono', weight: 500, color: ON_VIDEO.muted });
-  events.push(live ? time('LIVE', left, 7) : time(fmtTime(position), left, 7));
+  events.push(live ? time(t.tr('live'), left, 7) : time(fmtTime(position), left, 7));
   if (!live) events.push(time(fmtTime(duration), left + width, 9));
   return events;
 }
 
-/** Rows of the TV settings panel, in order. */
+/** Rows of the TV settings panel, in order; `label` is a string key (i18n.js). */
 export const PANEL_ROWS = [
-  { key: 'accent', label: 'Accent color' },
-  { key: 'bootAnimation', label: 'Animations' },
-  { key: 'sponsorBlock', label: 'Skip sponsors' },
-  { key: 'clock24', label: 'Clock' },
-  { key: 'cecSwitchInput', label: 'Switch TV input' },
+  { key: 'accent', label: 'rowAccent' },
+  { key: 'language', label: 'rowLanguage' },
+  { key: 'bootAnimation', label: 'rowAnimations' },
+  { key: 'sponsorBlock', label: 'rowSponsors' },
+  { key: 'clock24', label: 'rowClock' },
+  { key: 'cecSwitchInput', label: 'rowSwitchInput' },
 ];
 
-function panelValue(key, s) {
+function panelValue(t, key, s) {
+  if (key === 'language') return `‹ ${LANGUAGES[s.language]?.label ?? s.language} ›`;
   if (key === 'clock24') return s.clock24 ? '24h' : '12h';
-  return s[key] ? 'On' : 'Off';
+  return s[key] ? t.tr('on') : t.tr('off');
 }
 
 /** Settings panel on the right; `swatches` = [{ id, hex }], `focus` = row index. */
@@ -279,7 +294,7 @@ export function settingsPanel(t, { settings, focus, swatches }) {
   const innerW = w - 108;
   const events = [
     rect(x, y, w, h, { color: t.glass, radius: t.radius * 3, border: 3, borderColor: t.line }),
-    text('Settings', { x: inner, y: y + 50, px: 54, weight: 600, color: t.text }),
+    text(t.tr('settings'), { x: inner, y: y + 50, px: 54, weight: 600, color: t.text }),
   ];
 
   let rowY = y + 150;
@@ -295,7 +310,7 @@ export function settingsPanel(t, { settings, focus, swatches }) {
       }));
     }
     if (isAccent) {
-      events.push(text(row.label, { x: inner + 36, y: rowY + 28, px: 36, weight: 600, color: t.text }));
+      events.push(text(t.tr(row.label), { x: inner + 36, y: rowY + 28, px: 36, weight: 600, color: t.text }));
       swatches.forEach((sw, n) => {
         const cx = inner + 36 + 24 + n * 69;
         const cy = rowY + 28 + 56 + 24 + 12;
@@ -305,14 +320,14 @@ export function settingsPanel(t, { settings, focus, swatches }) {
     } else {
       const mid = rowY + rowH / 2;
       events.push(
-        text(row.label, { x: inner + 36, y: mid, an: 4, px: 36, weight: focused ? 600 : 400, color: t.text }),
-        text(panelValue(row.key, settings), { x: inner + innerW - 36, y: mid, an: 6, px: 36, color: focused ? t.text : t.muted }),
+        text(t.tr(row.label), { x: inner + 36, y: mid, an: 4, px: 36, weight: focused ? 600 : 400, color: t.text }),
+        text(panelValue(t, row.key, settings), { x: inner + innerW - 36, y: mid, an: 6, px: 36, color: focused ? t.text : t.muted }),
       );
     }
     rowY += rowH + GAP;
   });
 
-  events.push(text('◀ ▶ change · OK select · Back close', {
+  events.push(text(t.tr('panelFooter'), {
     x: inner, y: y + h - 54, an: 1, px: 30, spacing: 1.2, color: t.muted,
   }));
   return events;

@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ACCENTS, TWITCH_QUALITIES, isHex } from './shared/theme.js';
+import { LANGUAGES } from './shared/i18n.js';
 
 const bool = (v) => typeof v === 'boolean';
 
@@ -13,6 +14,7 @@ const SCHEMA = {
   bootAnimation: { def: true, ok: bool },
   sponsorBlock: { def: true, ok: bool },
   clock24: { def: true, ok: bool },
+  language: { def: 'en', ok: (v) => v in LANGUAGES },
   deviceName: { def: 'Pi-Cast', ok: (v) => typeof v === 'string' && v.trim().length > 0 && v.length <= 40 },
   twitchQuality: { def: '720p60', ok: (v) => TWITCH_QUALITIES.includes(v) },
   cecEnabled: { def: true, ok: bool },

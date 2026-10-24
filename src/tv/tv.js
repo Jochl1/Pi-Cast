@@ -1,5 +1,6 @@
 import QRCode from 'qrcode';
-import { ACCENTS, themeFor } from '../shared/theme.js';
+import { ACCENTS } from '../shared/theme.js';
+import { LANGUAGES } from '../shared/i18n.js';
 import { networkStatus } from '../network.js';
 import { thumbnailBgra } from './thumbnail.js';
 import { backgroundClip, backgroundPng } from './background.js';
@@ -69,7 +70,7 @@ export default class Tv {
     playback.on('started', () => this.#onStarted());
     playback.on('change', () => this.render());
     playback.on('ended', ({ reason }) => {
-      if (reason === 'error') this.toast("Couldn't play that link");
+      if (reason === 'error') this.toast(screens.look(this.settings.get()).tr('couldntPlay'));
     });
     cast.on('senderConnect', (name) => {
       this.sender = { name, until: Date.now() + POPUP_MS };
@@ -105,7 +106,7 @@ export default class Tv {
    */
   async #updateBackdrop() {
     const s = this.settings.get();
-    const t = themeFor(s);
+    const t = screens.look(s);
     const key = `${t.accent} ${s.bootAnimation}`;
     if (key === this.backdropKey) return;
     this.backdropKey = key;
@@ -156,6 +157,8 @@ export default class Tv {
       const list = Object.keys(ACCENTS);
       if (s.accent === 'custom') list.push('custom');
       patch = { accent: cycle(list, s.accent) };
+    } else if (key === 'language') {
+      patch = { language: cycle(Object.keys(LANGUAGES), s.language) };
     } else {
       patch = { [key]: !s[key] };
     }
@@ -208,7 +211,7 @@ export default class Tv {
     if (!this.mpv.socket) return; // redrawn on 'ready'
     const now = Date.now();
     const s = this.settings.get();
-    const t = themeFor(s);
+    const t = screens.look(s);
     const screen = this.screen();
     const status = this.playback.status();
     // While switching videos the old one keeps playing under the loading card.
@@ -231,7 +234,7 @@ export default class Tv {
     const layers = { home: null, loading: null, popup: null, pause: null, panel: null, toast: null };
     const sender = status.owner === 'cast' ? this.cast.senders()[0] : null;
     if (overVideo) {
-      layers.loading = screens.loadingOverVideo(t, screen === 'buffering' ? 'BUFFERING' : 'LOADING', { ...status, sender });
+      layers.loading = screens.loadingOverVideo(t, screen === 'buffering' ? 'buffering' : 'loading', { ...status, sender });
     }
     if (onHome) {
       layers.home = screens.home(t, {

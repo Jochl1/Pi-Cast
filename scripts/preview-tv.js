@@ -3,7 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { themeFor } from '../src/shared/theme.js';
+import { look } from '../src/tv/screens.js';
 import { scenes } from './tv-scenes.js';
 
 const [outDir = 'preview', ffmpeg = 'ffmpeg'] = process.argv.slice(2);
@@ -27,7 +27,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 // ffmpeg's filter syntax trips over drive letters, so work with relative paths in outDir.
 fs.cpSync('assets/fonts', path.join(outDir, 'fonts'), { recursive: true });
 for (const [name, scene] of Object.entries(scenes)) {
-  const t = themeFor(scene.settings);
+  const t = look(scene.settings);
   const events = scene.layers(t).flatMap((layer, i) => layer.map((e) => `Dialogue: ${i},0:00:00.00,0:00:05.00,Default,,0,0,0,,${e}`));
   fs.writeFileSync(path.join(outDir, `${name}.ass`), header + events.join('\n') + '\n');
   const bg = scene.video ? '0x2A3140' : t.bg.replace('#', '0x');

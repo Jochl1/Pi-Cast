@@ -1,7 +1,11 @@
 import { ACCENTS, TWITCH_QUALITIES, themeFor } from '/shared/theme.js';
+import { LANGUAGES, translator } from '/shared/i18n.js';
 
 const $ = (id) => document.getElementById(id);
-const SOURCE_LABEL = { youtube: 'YouTube', twitch: 'Twitch', generic: 'Link' };
+const SOURCE_LABEL = { youtube: 'YouTube', twitch: 'Twitch' };
+const sourceLabel = (kind) => SOURCE_LABEL[kind] ?? tr('link');
+// Texts in the language setting's language (see /shared/i18n.js).
+let tr = translator('en');
 
 const state = {
   status: null,
@@ -9,6 +13,7 @@ const state = {
   settings: null,
   connected: false,
   draggingVolume: false,
+  recent: [],
 };
 
 // ---------- API ----------
@@ -24,7 +29,7 @@ async function api(method, path, body) {
     if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
     return data;
   } catch (e) {
-    toast(e.message === 'Failed to fetch' ? "Can't reach Pi-Cast" : e.message);
+    toast(e.message === 'Failed to fetch' ? tr('cantReach') : e.message);
     throw e;
   }
 }
@@ -54,7 +59,10 @@ function connect() {
     state.settings = JSON.parse(e.data);
     renderSettings();
   });
-  es.addEventListener('recent', (e) => renderRecent(JSON.parse(e.data)));
+  es.addEventListener('recent', (e) => {
+    state.recent = JSON.parse(e.data);
+    renderRecent();
+  });
 }
 
 function setConnected(on) {
@@ -93,7 +101,7 @@ function fmtTime(sec) {
 
 function renderPill() {
   const name = state.settings?.deviceName ?? state.status?.deviceName ?? 'Pi-Cast';
-  $('tv-name').textContent = state.connected ? name : `${name} · offline`;
+  $('tv-name').textContent = state.connected ? name : tr('deviceOffline', { name });
 }
 
 function renderStatus() {
@@ -103,21 +111,21 @@ function renderStatus() {
   $('tv-code').textContent = s.pairingCode ?? '—';
 
   const active = !!s.url;
-  let label = 'Nothing playing';
+  let label = tr('nothingPlaying');
   if (active) {
-    if (s.loading) label = 'Loading…';
-    else if (s.paused) label = 'Paused';
-    else label = s.live ? 'Live on TV' : 'Playing on TV';
+    if (s.loading) label = tr('loadingState');
+    else if (s.paused) label = tr('pausedState');
+    else label = tr(s.live ? 'liveOnTv' : 'playingOnTv');
   }
   $('state-label').textContent = label;
   $('stop').hidden = !active;
-  $('title').textContent = active ? (s.title || s.url) : 'Ready to cast';
+  $('title').textContent = active ? (s.title || s.url) : tr('readyToCast');
 
-  const source = SOURCE_LABEL[s.kind] ?? '';
-  const by = s.owner === 'cast' && s.senders.length ? `from ${s.senders[0]}` : '';
+  const source = active ? sourceLabel(s.kind) : '';
+  const by = s.owner === 'cast' && s.senders.length ? tr('from', { name: s.senders[0] }) : '';
   $('sub').textContent = active
     ? [s.channel, source, by].filter(Boolean).join(' · ')
-    : `Open YouTube and tap Cast → ${s.deviceName}`;
+    : tr('webCastHint', { name: s.deviceName });
 
   const img = $('thumb-img');
   if (active && s.thumbnail) {
@@ -137,14 +145,14 @@ function renderStatus() {
 
   const play = $('play');
   play.classList.toggle('paused', !active || s.paused);
-  play.setAttribute('aria-label', active && !s.paused ? 'Pause' : 'Play');
+  play.setAttribute('aria-label', tr(active && !s.paused ? 'pause' : 'play'));
   play.disabled = !active;
   $('back').disabled = $('forward').disabled = !active || s.live;
   $('progress').classList.toggle('live', active && s.live);
 
   if (!state.draggingVolume) $('volume').value = s.volume;
   $('mute').classList.toggle('muted', s.muted);
-  $('mute').setAttribute('aria-label', s.muted ? 'Unmute' : 'Mute');
+  $('mute').setAttribute('aria-label', tr(s.muted ? 'unmute' : 'mute'));
 
   renderProgress();
 }
@@ -153,7 +161,7 @@ function renderProgress() {
   const s = state.status;
   const active = !!s?.url;
   if (active && s.live) {
-    $('elapsed').textContent = 'LIVE';
+    $('elapsed').textContent = tr('live');
     $('total').textContent = '';
     return;
   }
@@ -166,7 +174,8 @@ function renderProgress() {
   $('progress-fill').style.width = active && dur ? `${(pos / dur) * 100}%` : '0';
 }
 
-function renderRecent(items) {
+function renderRecent() {
+  const items = state.recent;
   const list = $('recent-list');
   list.replaceChildren(...items.map((item) => {
     const li = document.createElement('li');
@@ -180,7 +189,7 @@ function renderRecent(items) {
     title.textContent = item.title || item.url;
     const source = document.createElement('span');
     source.className = 'r-source';
-    source.textContent = SOURCE_LABEL[item.kind] ?? 'Link';
+    source.textContent = sourceLabel(item.kind);
     btn.append(thumb, title, source);
     btn.addEventListener('click', () => post('/api/play', { url: item.url }));
     li.append(btn);
@@ -276,15 +285,32 @@ function buildSettings() {
   name.addEventListener('change', saveName);
   name.addEventListener('keydown', (e) => { if (e.key === 'Enter') name.blur(); });
 
-  const quality = $('twitch-quality');
-  quality.replaceChildren(...TWITCH_QUALITIES.map((q) => new Option(q === '1080p60' ? '1080p60 (may stutter)' : q, q)));
-  quality.addEventListener('change', () => change({ twitchQuality: quality.value }));
+  $('twitch-quality').addEventListener('change', (e) => change({ twitchQuality: e.target.value }));
+
+  const language = $('language');
+  language.replaceChildren(...Object.entries(LANGUAGES).map(([id, l]) => new Option(l.label, id)));
+  language.addEventListener('change', () => change({ language: language.value }));
+}
+
+/** Puts every fixed text in the current language; the rest is rendered with tr(). */
+function applyLanguage(lang) {
+  if (tr.lang === lang && document.documentElement.dataset.lang) return;
+  tr = translator(lang);
+  document.documentElement.lang = tr.lang;
+  document.documentElement.dataset.lang = tr.lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = tr(el.dataset.i18n);
+  for (const el of document.querySelectorAll('[data-i18n-aria]')) el.setAttribute('aria-label', tr(el.dataset.i18nAria));
+  for (const el of document.querySelectorAll('[data-i18n-placeholder]')) el.placeholder = tr(el.dataset.i18nPlaceholder);
+  $('twitch-quality').replaceChildren(...TWITCH_QUALITIES.map((q) => new Option(q === '1080p60' ? `1080p60 ${tr('mayStutter')}` : q, q)));
+  renderStatus();
+  renderRecent();
 }
 
 function renderSettings() {
   const s = state.settings;
   if (!s) return;
   applyTheme(s);
+  applyLanguage(s.language);
   renderPill();
   for (const b of $('swatches').children) b.setAttribute('aria-pressed', String(s.accent === b.dataset.accent));
   $('custom-color').value = s.accent === 'custom' ? s.customAccent : themeFor(s).accent;
@@ -294,6 +320,8 @@ function renderSettings() {
   if (document.activeElement !== $('device-name')) $('device-name').value = s.deviceName;
   $('twitch-quality').value = s.twitchQuality;
   $('twitch-quality-value').textContent = s.twitchQuality;
+  $('language').value = s.language;
+  $('language-value').textContent = LANGUAGES[s.language]?.label ?? s.language;
 }
 
 // ---------- Navigation ----------

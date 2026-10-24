@@ -53,9 +53,9 @@ There are 10 presets plus a custom colour: Violet `#A898FF` (default), Sky `#6FA
    - The same card says "BUFFERING" when a video stalls for more than a second.
 4. **Now-playing pop-ups** that fade after about 5 s: a "<sender> connected" pill at the top right; a card at the bottom left with the thumbnail, "NOW PLAYING" in the accent, the title, and the source and quality; and a thin accent progress line.
 5. **Paused:** dimmed video, a pause icon in an accent ring, and at the bottom the title, channel and source, an accent progress bar, and the elapsed and total times in mono.
-6. **TV settings panel:** a glass panel on the right over the dimmed home screen. Rows: accent (a swatch row), animations, skip sponsors, clock, switch TV input. Footer: "◀ ▶ change · OK select · Back close". OK on the home screen opens it; the arrows and Back navigate it.
+6. **TV settings panel:** a glass panel on the right over the dimmed home screen. Rows: accent (a swatch row), language, animations, skip sponsors, clock, switch TV input. Footer: "◀ ▶ change · OK select · Back close". OK on the home screen opens it; the arrows and Back navigate it.
 7. **Toasts** for short messages, such as "Couldn't play that link".
-8. **iPhone web app:** a header with the wordmark and a "● <TV name>" pill; a now-playing card (thumbnail, state, title and channel, progress, back 10 s / play-pause / forward 10 s, volume); a "Play a link" field; and a Recent list. Settings: the accent grid (5×2) and a custom colour; animations; device name, Twitch quality, SponsorBlock, 24-hour clock; and the CEC toggles ("Control with TV remote", "Switch TV input on cast").
+8. **iPhone web app:** a header with the wordmark and a "● <TV name>" pill; a now-playing card (thumbnail, state, title and channel, progress, back 10 s / play-pause / forward 10 s, volume); a "Play a link" field; and a Recent list. Settings: the accent grid (5×2) and a custom colour; animations; device name, language, Twitch quality, SponsorBlock, 24-hour clock; and the CEC toggles ("Control with TV remote", "Switch TV input on cast").
 
 ## 3. Architecture
 
@@ -75,6 +75,7 @@ Node 22 (ESM), with `express`, `yt-cast-receiver` and `qrcode` as the only depen
 | `streamlink.js` | Runs streamlink for Twitch and returns the local HTTP URL. |
 | `sources.js`, `metadata.js` | Link classification; quick title/channel/thumbnail lookup (YouTube oEmbed, Twitch from the URL). |
 | `controls.js` | Play/pause/seek/volume for the web app and the TV remote. |
+| `shared/i18n.js` | Every TV and web app text in English and German; `translator(lang)` gives `tr(key, vars)` and the date locale. Served to the web app as `/shared/i18n.js`. |
 | `settings.js`, `events.js`, `recent.js` | `data/settings.json` with a schema, the SSE hub, `data/recent.json` (last 20). |
 | `web.js` | HTTP API and the web app. |
 | `tv/` | TV renderer: `tv.js` (state, layers, timers), `screens.js` (pure layout to ASS), `ass.js` (ASS helpers), `thumbnail.js`. |
@@ -171,6 +172,7 @@ streamlink with `--player-external-http` on `127.0.0.1`; Pi-Cast waits for its U
 | Twitch quality | Takes effect on the next stream. |
 | SponsorBlock | Restart mpv when idle. |
 | Clock | Redraw the home screen. |
+| Language | Redraw the overlays, re-label the web app, regenerate the boot splash ("STARTING UP" / "WIRD GESTARTET"). |
 | CEC toggles | Start or stop CEC; switch the input on cast. |
 
 ### Boot and install
