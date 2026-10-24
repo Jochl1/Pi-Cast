@@ -28,11 +28,34 @@ export default class Mpv extends EventEmitter {
     this.socket = null;
     this.proc = null;
     this.shuttingDown = false;
+    this.restartDelay = 2000;
+    this.restartTimer = null;
   }
 
+  /** Starts mpv. Never throws: failures are logged and retried with backoff. */
   async start() {
     this.#spawn();
-    await this.#connect();
+    try {
+      await this.#connect();
+      this.restartDelay = 2000;
+    } catch (e) {
+      // A running-but-unreachable mpv gets killed; its 'exit' schedules the restart.
+      if (this.proc?.pid !== undefined && this.proc.exitCode === null) {
+        this.log.error(e.message);
+        this.proc.kill();
+      }
+    }
+  }
+
+  #scheduleRestart(why) {
+    if (this.shuttingDown || this.restartTimer) return;
+    const delay = this.restartDelay;
+    this.restartDelay = Math.min(delay * 2, 60000);
+    this.log.error(`mpv ${why}, restarting in ${delay / 1000}s`);
+    this.restartTimer = setTimeout(() => {
+      this.restartTimer = null;
+      this.start();
+    }, delay);
   }
 
   async shutdown() {
@@ -61,20 +84,31 @@ export default class Mpv extends EventEmitter {
       ...mpvExtraArgs,
     ];
     this.log.debug('spawning mpv', args.join(' '));
-    this.proc = spawn(mpvPath, args, { stdio: ['ignore', 'ignore', 'pipe'] });
-    this.proc.stderr.on('data', (d) => this.log.debug('[mpv]', d.toString().trim()));
-    this.proc.on('exit', (code, signal) => {
-      this.socket?.destroy();
-      this.socket = null;
-      if (this.shuttingDown) return;
-      this.log.error(`mpv exited (code ${code}, signal ${signal}), restarting in 2s`);
-      setTimeout(() => this.start().catch((e) => this.log.error('mpv restart failed:', e.message)), 2000);
+    const proc = spawn(mpvPath, args, { stdio: ['ignore', 'ignore', 'pipe'] });
+    this.proc = proc;
+    proc.stderr.on('data', (d) => this.log.debug('[mpv]', d.toString().trim()));
+    proc.on('error', (e) => {
+      this.#dropSocket();
+      this.#scheduleRestart(`failed to start (${e.message})`);
     });
+    proc.on('exit', (code, signal) => {
+      this.#dropSocket();
+      this.#scheduleRestart(`exited (code ${code}, signal ${signal})`);
+    });
+  }
+
+  #dropSocket() {
+    this.socket?.destroy();
+    this.socket = null;
   }
 
   async #connect() {
     const deadline = Date.now() + 10000;
+    const proc = this.proc;
     for (;;) {
+      if (this.proc !== proc || proc.exitCode !== null || proc.pid === undefined) {
+        throw new Error('mpv is not running');
+      }
       try {
         this.socket = await new Promise((resolve, reject) => {
           const s = net.createConnection(this.config.mpvSocket, () => resolve(s));
@@ -162,12 +196,17 @@ export default class Mpv extends EventEmitter {
   setVolume(level) { return this.set('volume', Math.max(0, Math.min(100, level))); }
   setMute(muted) { return this.set('mute', muted); }
 
-  /** Full-screen text overlay (ASS markup), e.g. the idle screen. */
-  showOverlay(ass) {
-    return this.command({ name: 'osd-overlay', id: 1, format: 'ass-events', data: ass });
+  /**
+   * Text/shape overlay in ASS markup, laid out on a 1920x1080 canvas
+   * regardless of the real screen size. Higher z draws on top.
+   */
+  showOverlay(ass, { id = 1, z = 0 } = {}) {
+    return this.command({
+      name: 'osd-overlay', id, format: 'ass-events', data: ass, res_x: 1920, res_y: 1080, z,
+    });
   }
 
-  clearOverlay() {
-    return this.command({ name: 'osd-overlay', id: 1, format: 'none', data: '' });
+  clearOverlay({ id = 1 } = {}) {
+    return this.command({ name: 'osd-overlay', id, format: 'none', data: '' });
   }
 }

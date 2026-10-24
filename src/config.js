@@ -3,6 +3,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+// Runtime state: settings, recent list, receiver session, generated images.
+export const DATA_DIR = process.env.PICAST_DATA || path.join(ROOT, 'data');
 
 // Prefer tools from the project venv (created by deploy/install.sh), fall back to PATH.
 function venvBin(name) {

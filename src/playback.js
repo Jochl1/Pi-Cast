@@ -46,16 +46,21 @@ export default class Playback extends EventEmitter {
 
     try {
       if (kind === 'twitch') {
+        // Opening a new stream kills the old streamlink first; the resulting
+        // EOF of the old item is ignored because we're switching.
         await this.mpv.load(await this.streamlink.open(url));
       } else {
         // Load first, then drop any old Twitch stream, so its EOF lands as a 'stop'.
         await this.mpv.load(url, { start });
-        this.streamlink.close();
+        await this.streamlink.close();
       }
     } catch (e) {
       this.switching = false;
       this.owner = null;
       this.source = null;
+      // Don't leave the previous item playing unowned.
+      await this.streamlink.close();
+      await this.mpv.stop().catch(() => {});
       throw e;
     }
   }
@@ -63,8 +68,9 @@ export default class Playback extends EventEmitter {
   async stop() {
     this.owner = null;
     this.source = null;
-    this.streamlink.close();
+    // Stop mpv before killing streamlink, so the stream's end is seen as a 'stop'.
     await this.mpv.stop();
+    await this.streamlink.close();
   }
 
   status() {
