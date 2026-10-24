@@ -5,6 +5,8 @@ import { createLogger } from './log.js';
 import Mpv from './mpv.js';
 import Streamlink from './streamlink.js';
 import Ytdl from './ytdl.js';
+import Instagram from './instagram.js';
+import Reels from './reels.js';
 import Playback from './playback.js';
 import Cast from './cast.js';
 import Settings, { streamlinkQuality } from './settings.js';
@@ -32,6 +34,7 @@ const mpv = new Mpv(config, log);
 mpv.scriptFilter = (file) => !file.startsWith('sponsorblock') || settings.get().sponsorBlock;
 const streamlink = new Streamlink(config, log);
 const ytdl = new Ytdl(config, log);
+const instagram = new Instagram(log);
 const playback = new Playback(mpv, streamlink, ytdl, log, {
   getTwitchQuality: () => streamlinkQuality(settings.get().twitchQuality),
 });
@@ -42,6 +45,9 @@ const cast = new Cast({
   logLevel: config.logLevel,
 });
 const controls = createControls({ playback, cast, mpv });
+const reels = new Reels({
+  instagram, playback, controls, log,
+});
 
 function lanAddress() {
   const all = Object.values(os.networkInterfaces()).flat()
@@ -68,7 +74,10 @@ function pushStatus() {
     events.send('status', getStatus());
   }, 150);
 }
-events.setSnapshot(() => ({ status: getStatus(), settings: settings.get(), recent: recent.list() }));
+events.setSnapshot(() => ({
+  status: getStatus(), settings: settings.get(), recent: recent.list(), instagram: instagram.state,
+}));
+instagram.on('change', (state) => events.send('instagram', state));
 // The polled time-pos only matters while something plays (the backdrop ticks too).
 mpv.on('property', (name) => {
   if (name !== 'time-pos' || playback.source) pushStatus();
@@ -78,6 +87,7 @@ cast.on('change', pushStatus);
 
 playback.on('loaded', () => {
   const s = playback.source;
+  if (s.kind === 'instagram') return; // every Reel would push the rest out
   const { url, kind, thumbnail, channel } = s;
   recent.add({ url, kind, title: s.title ?? mpv.props['media-title'] ?? url, channel, thumbnail })
     .then(() => events.send('recent', recent.list()))
@@ -114,10 +124,11 @@ settings.on('change', (values, changed) => {
 const sounds = new Sounds({ config, mpv, playback, settings, log });
 sounds.start();
 const tv = new Tv({
-  mpv, playback, cast, settings, sounds, log,
+  mpv, playback, cast, settings, sounds, reels, log,
   remote: `${os.hostname()}.local:${config.webPort}`,
 });
 tv.start();
+reels.on('toast', (key, sound) => tv.toast(translator(settings.get().language)(key), { sound }));
 
 // Keeps the Plymouth boot splash in the current accent.
 new BootSplash({ settings, log });
@@ -154,15 +165,23 @@ function playShortcut(color) {
   });
 }
 
-cec.on('key', (key) => {
+/** A key from the TV remote (or /api/tv/key); returns true if it did something. */
+function remoteKey(key) {
   if (key in KEY_COLORS) {
     playShortcut(key);
-    return;
+    return true;
   }
-  // The settings panel (and OK on the home screen) come first.
-  if (tv.key(key) || !playback.source) return;
-  Promise.resolve(REMOTE_ACTIONS[key]?.()).catch((e) => log.debug(`remote key ${key} failed:`, e.message));
-});
+  // Reels, then the settings panel (and OK on the home screen) come first.
+  if (reels.key(key) || tv.key(key)) return true;
+  if (key === 'up' && tv.screen() === 'home') {
+    reels.open().catch((e) => log.warn('opening Reels failed:', e.message));
+    return true;
+  }
+  if (!playback.source || !REMOTE_ACTIONS[key]) return false;
+  Promise.resolve(REMOTE_ACTIONS[key]()).catch((e) => log.debug(`remote key ${key} failed:`, e.message));
+  return true;
+}
+cec.on('key', remoteKey);
 playback.on('play', () => {
   if (settings.get().cecEnabled && settings.get().cecSwitchInput) cec.switchInput();
 });
@@ -187,10 +206,11 @@ if (settings.get().cecEnabled) cec.start();
 // Doesn't wait for mpv: it retries in the background if it can't start.
 mpv.start();
 ytdl.start();
+instagram.start();
 await cast.start(settings.get().deviceName);
 
 const web = createWebServer({
-  playback, controls, settings, recent, events, tv, getStatus, getTheme, log,
+  playback, controls, settings, recent, events, remoteKey, instagram, getStatus, getTheme, log,
 });
 web.listen(config.webPort, () => {
   log.info(`Pi-Cast "${settings.get().deviceName}" ready — web app at http://${lanAddress()}:${config.webPort}`);
@@ -200,6 +220,7 @@ async function shutdown() {
   log.info('shutting down');
   cec.stop();
   ytdl.stop();
+  instagram.stop();
   await streamlink.close();
   await cast.stop();
   await mpv.shutdown();

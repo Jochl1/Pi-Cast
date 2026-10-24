@@ -8,6 +8,7 @@ An ad-free "Chromecast replacement" for a **Raspberry Pi 3 Model B** (1 GB RAM, 
 
 - shows up as a cast target in the **YouTube app** and plays without ads (yt-dlp fetches the streams directly), skipping sponsor segments with SponsorBlock;
 - plays **Twitch** and other links sent from the **iPhone web app** the Pi serves, or from the "Send to Pi-Cast" iOS Shortcut in the share sheet;
+- shows **Instagram Reels**, scrolled with the remote's arrow keys;
 - looks like a finished product: an animated boot splash, no Linux text on screen, a home screen, now-playing pop-ups, a pause screen and a settings panel;
 - is controlled with the **TV remote over HDMI-CEC**.
 
@@ -54,8 +55,9 @@ There are 10 presets plus a custom colour: Violet `#A898FF` (default), Sky `#6FA
 4. **Now-playing pop-ups** that fade after about 5 s: a "<sender> connected" pill at the top right; a card at the bottom left with the thumbnail, "NOW PLAYING" in the accent, the title, and the source and quality; and a thin accent progress line.
 5. **Paused:** dimmed video, a pause icon in an accent ring, and at the bottom the title, channel and source, an accent progress bar, and the elapsed and total times in mono.
 6. **TV settings panel:** a glass panel on the right over the dimmed home screen. Rows: accent (a swatch row), language, animations, skip sponsors, clock, switch TV input. Footer: "◀ ▶ change · OK select · Back close". OK on the home screen opens it; the arrows and Back navigate it.
-7. **Toasts** for short messages, such as "Couldn't play that link", or "● Trymacs" (with the key's colour) when a colour key starts a favourite.
-8. **iPhone web app:** a header with the wordmark and a "● <TV name>" pill; a now-playing card (thumbnail, state, title and channel, progress, back 10 s / play-pause / forward 10 s, volume); a "Play a link" field; and a Recent list. Settings: the accent grid (5×2) and a custom colour; animations; device name, language, Twitch quality, SponsorBlock, 24-hour clock; colour-key favourites (name and link per colour); and the CEC toggles ("Control with TV remote", "Switch TV input on cast").
+7. **Instagram Reels:** ▲ on the home screen opens them. The Reel plays upright in the middle (mpv's `background-color` fills the sides). Left: "INSTAGRAM" in the accent above "Reels", and the keys at the bottom. Right, bottom-aligned: @user, up to four caption lines (muted) and the like count with a ♥, filled in the accent once liked. OK likes with a big ♥ that fades out over the Reel. Pause shows the accent pause ring. Between Reels only the dots show in the middle, no loading card.
+8. **Toasts** for short messages, such as "Couldn't play that link", or "● Trymacs" (with the key's colour) when a colour key starts a favourite.
+9. **iPhone web app:** a header with the wordmark and a "● <TV name>" pill; a now-playing card (thumbnail, state, title and channel, progress, back 10 s / play-pause / forward 10 s, volume); a "Play a link" field; and a Recent list. Settings: the accent grid (5×2) and a custom colour; animations; device name, language, Twitch quality, SponsorBlock, 24-hour clock; colour-key favourites (name and link per colour); the CEC toggles ("Control with TV remote", "Switch TV input on cast"); and the Instagram login (username and password, a box for the security code, or a browser's session ID under "Login not working?"), which shows the account and a logout button once logged in. `#instagram` opens that section.
 
 ## 3. Architecture
 
@@ -84,10 +86,12 @@ Node 22 (ESM), with `express`, `yt-cast-receiver` and `qrcode` as the only depen
 | `tv/background.js` | Paints the home backdrop (PNG) and finds its loop clip. |
 | `network.js` | Wi-Fi status via `nmcli`. |
 | `sounds.js` | UI sounds and the startup sound, through `bin/sounds.py` (see below). |
+| `instagram.js` | Instagram worker (`bin/insta.py`) and the login state. |
+| `reels.js` | Reels on the TV: the list, scrolling, likes, keys. |
 
 ### Playback ownership
 
-`Playback` is the only thing that loads or stops media, so the cast receiver and the web app never fight over mpv. `owner` is `'cast'`, `'web'` or `null`. A new request from the other side emits `takeover`, and the cast session is told it lost the screen. While a new item replaces the old one (`switching`), the old item's `end-file` is ignored. `ended` reports `eof` or `error`.
+`Playback` is the only thing that loads or stops media, so the cast receiver and the web app never fight over mpv. `owner` is `'cast'`, `'web'`, `'instagram'` or `null`. A new request from the other side emits `takeover`, and the cast session is told it lost the screen. While a new item replaces the old one (`switching`), the old item's `end-file` is ignored. `ended` reports `eof` or `error`.
 
 `controls.js` routes through the cast player while `owner === 'cast'`, so the phone that's casting stays in sync.
 
@@ -130,6 +134,18 @@ Node 22 (ESM), with `express`, `yt-cast-receiver` and `qrcode` as the only depen
 - The receiver does **not** detect the end of a video. On `ended`, `castPlayer` calls `pause()` then `next()`, and `stop()` if there's nothing next.
 - "Link with TV code" comes from `getPairingCodeRequestService()`. The code is shown on the home screen and in the web app.
 - Its default node-persist store wrote before it had initialised and lost data, so `receiverStore.js` replaces it. Writes are serialised, because concurrent writes raced on the temp file.
+
+### Instagram
+
+- `bin/insta.py` (instagrapi, in `.venv`) stays running like the yt-dlp worker: JSON lines over stdin/stdout with `status`, `login`, `code`, `logout`, `reels` and `like`. Calls run one at a time on one thread, with instagrapi's 1–3 s random delays. A login waits on that thread for a `code` request (security code by email/SMS, or 2FA), which the main thread passes on.
+- The session (cookies and device, never the password) is in `data/instagram.json` (mode 600). When Instagram says the login is gone, the file is deleted and the TV says "log in again in the web app".
+- **Password login is broken in instagrapi** (since September 2026: "your version of Instagram is out of date", [#2807](https://github.com/subzeroid/instagrapi/issues/2807)). Logging in with a browser's `sessionid` cookie (`login_by_sessionid`) works.
+- **The feed is `clips/discover/`**, the Reels tab. `clips/connected/` only has Reels from followed accounts, and the account follows nobody. instagrapi's `reels()` always restarts at the first page, so the worker pages the endpoint itself and keeps the cursor. A page has only about 4 Reels; ads are dropped. The next page is fetched while 3 or fewer are ahead, and a failed fetch isn't retried for a minute.
+- **Video:** the smallest `video_versions` entry at least 1080 tall, else the largest. So far all were H.264 High, 720×1280 or 540×960, 30 fps: hardware-decoded.
+- **Playback:** `Playback.play(url, { owner: 'instagram', info, loop: true })`. `info` (kind, title, @user, thumbnail, duration) replaces the metadata lookup, and the URL is loaded as an EDL of 60 copies of itself, like the backdrop clip, so it loops without a black flash. `status()` reports the position within one round. Reels don't go into Recent and get no now-playing card.
+- `Reels` ends when anyone else plays something, or when playback stops (web app, standby). A Reel that fails is skipped; three in a row close Reels.
+- Remote keys go through `remoteKey()` in `index.js`: colour keys, then Reels, then the settings panel, then ▲ on home (opens Reels), then the playback keys. `/api/tv/key` uses the same path.
+- The like sound isn't played: mpv holds the HDMI audio device while a Reel plays (§4.5).
 
 ### Twitch
 
@@ -216,6 +232,7 @@ Measured on a Pi 3 with Raspberry Pi OS Lite 64-bit (Trixie, mpv 0.40, Mesa 26).
 - `--hwdec=drm` doesn't work on the Pi 3. It falls back to software decoding at about 350% CPU.
 - In overlay mode, mpv's video equalizer (`brightness`, `contrast`) and GL filters don't apply to the video. Dimming has to be an overlay.
 - 1080p30 H.264 is the cap; 1080p60 is too much.
+- **No 90° rotation in overlay mode.** `video-rotate=90` makes every frame fail (`drmprime-overlay: Failed to create framebuffer on layer 0: Invalid argument`), and the picture breaks. The vc4 planes only flip (0°/180°). Rotating would need the copy path (GL) or re-encoding.
 
 ### 4.2 OSD texture limit
 
@@ -257,9 +274,10 @@ The Pi 3 throttles from 1200 to 600 MHz on undervoltage (`vcgencmd get_throttled
   - A proper power supply is likely the biggest single win.
 - **TV black with a signal** happened once, and power-cycling the TV fixed it. If it comes back, test whether CEC is involved by turning it off in the web app.
 
+- **Instagram:** fetching the next Reel's video ahead (key to first frame is now a fresh HTTP open). A QR code on the TV that opens the web app's `#instagram` when nobody is logged in. Feed posts and Stories besides Reels.
+
 ### Ideas for later (from the user, not designed yet)
 
-- **Instagram on the TV:** Reels/feed scrolled with the remote's arrow keys, a like button (OK), and login by scanning a QR code on the TV with the phone.
 - **Party games with the phone as controller:** Pong, Connect 4, tic-tac-toe and other simple games. The TV shows the game; phones join through the web app (QR code) and send input over the same HTTP/SSE channel.
 - **Spotify:** pi-cast as a Spotify Connect speaker (librespot, e.g. via raspotify; needs Premium), with the cover, title and progress on the TV. librespot needs the HDMI audio device, which mpv and the sounds helper also want (§4.5). It could hand its audio to mpv through a pipe, or take the device the way the sounds helper does.
 - **Colour key legend:** show what the four colour keys do, e.g. a small row of coloured dots with the favourites' names on the home screen (and in the settings panel). For Twitch favourites it could show who's live right now.

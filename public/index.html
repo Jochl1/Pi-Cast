@@ -142,6 +142,49 @@
     <p class="hint" data-i18n="colourKeysHint">A colour key on the TV remote plays its favourite, on any screen.</p>
   </section>
 
+  <section class="group" id="instagram">
+    <h2 class="section-label" data-i18n="instagram">Instagram</h2>
+    <form class="list" id="ig-login" autocomplete="on">
+      <label class="row-item" for="ig-username">
+        <span data-i18n="igUsername">Username</span>
+        <input id="ig-username" class="value-input" type="text" name="username" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="next">
+      </label>
+      <label class="row-item" for="ig-password">
+        <span data-i18n="igPassword">Password</span>
+        <input id="ig-password" class="value-input" type="password" name="password" autocomplete="current-password" enterkeyhint="go">
+      </label>
+      <button type="submit" class="row-item row-btn" id="ig-login-btn" data-i18n="igLogin">Log in</button>
+    </form>
+    <form class="list" id="ig-code" hidden>
+      <label class="row-item" for="ig-code-input">
+        <span data-i18n="igCode">Security code</span>
+        <input id="ig-code-input" class="value-input mono" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" enterkeyhint="done">
+      </label>
+      <div class="row-item row-btns">
+        <button type="button" class="text-btn" id="ig-code-cancel" data-i18n="igCancel">Cancel</button>
+        <button type="submit" class="text-btn accent" data-i18n="igConfirm">Confirm</button>
+      </div>
+    </form>
+    <details class="ig-session" id="ig-session">
+      <summary data-i18n="igSessionSummary">Login not working?</summary>
+      <p class="hint" data-i18n="igSessionHint">Log in on instagram.com in a browser on a computer, open the developer tools (F12) → Application → Cookies → instagram.com, and copy the value of "sessionid".</p>
+      <form class="list" id="ig-session-form">
+        <label class="row-item" for="ig-sessionid">
+          <span data-i18n="igSessionId">Session ID</span>
+          <input id="ig-sessionid" class="value-input mono" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="go">
+        </label>
+        <button type="submit" class="row-item row-btn" id="ig-session-btn" data-i18n="igLogin">Log in</button>
+      </form>
+    </details>
+    <div class="list" id="ig-account" hidden>
+      <div class="row-item">
+        <span><span data-i18n="igLoggedInAs">Logged in as</span> <strong id="ig-user"></strong></span>
+        <button type="button" class="text-btn" id="ig-logout" data-i18n="igLogout">Log out</button>
+      </div>
+    </div>
+    <p class="hint" id="ig-hint"></p>
+  </section>
+
   <section class="group">
     <h2 class="section-label" data-i18n="tvRemote">TV remote (HDMI-CEC)</h2>
     <div class="list">

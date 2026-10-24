@@ -2,7 +2,7 @@ import { ACCENTS, KEY_COLORS, TWITCH_QUALITIES, themeFor } from '/shared/theme.j
 import { LANGUAGES, translator } from '/shared/i18n.js';
 
 const $ = (id) => document.getElementById(id);
-const SOURCE_LABEL = { youtube: 'YouTube', twitch: 'Twitch' };
+const SOURCE_LABEL = { youtube: 'YouTube', twitch: 'Twitch', instagram: 'Instagram' };
 const sourceLabel = (kind) => SOURCE_LABEL[kind] ?? tr('link');
 // Texts in the language setting's language (see /shared/i18n.js).
 let tr = translator('en');
@@ -14,6 +14,7 @@ const state = {
   connected: false,
   draggingVolume: false,
   recent: [],
+  instagram: null,
 };
 
 // ---------- API ----------
@@ -62,6 +63,13 @@ function connect() {
   es.addEventListener('recent', (e) => {
     state.recent = JSON.parse(e.data);
     renderRecent();
+  });
+  es.addEventListener('instagram', (e) => {
+    const before = state.instagram;
+    state.instagram = JSON.parse(e.data);
+    // A login that just failed.
+    if (before?.busy && !state.instagram.busy && state.instagram.error) toast(tr(`igErr_${state.instagram.error}`));
+    renderInstagram();
   });
 }
 
@@ -356,6 +364,7 @@ function applyLanguage(lang) {
   $('twitch-quality').replaceChildren(...TWITCH_QUALITIES.map((q) => new Option(q === '1080p60' ? `1080p60 ${tr('mayStutter')}` : q, q)));
   renderStatus();
   renderRecent();
+  renderInstagram();
 }
 
 function renderSettings() {
@@ -382,19 +391,79 @@ function renderSettings() {
   $('language-value').textContent = LANGUAGES[s.language]?.label ?? s.language;
 }
 
+// ---------- Instagram ----------
+
+function renderInstagram() {
+  const ig = state.instagram;
+  if (!ig) return;
+  const loggedIn = !!ig.user;
+  $('ig-login').hidden = loggedIn || !!ig.code || !ig.available;
+  $('ig-session').hidden = $('ig-login').hidden;
+  $('ig-session-btn').disabled = ig.busy;
+  $('ig-code').hidden = !ig.code;
+  $('ig-account').hidden = !loggedIn;
+  $('ig-user').textContent = loggedIn ? `@${ig.user}` : '';
+  const btn = $('ig-login-btn');
+  btn.disabled = ig.busy;
+  btn.textContent = tr(ig.busy ? 'igLoggingIn' : 'igLogin');
+  let hint = tr('igHint');
+  if (!ig.available) hint = tr('igUnavailable');
+  else if (ig.code) hint = tr({ email: 'igCodeEmail', sms: 'igCodeSms' }[ig.code] ?? 'igCode2fa');
+  else if (loggedIn) hint = tr('igTvHint');
+  $('ig-hint').textContent = hint;
+}
+
+function bindInstagram() {
+  $('ig-login').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const username = $('ig-username').value.trim();
+    const password = $('ig-password').value;
+    if (!username || !password) return;
+    document.activeElement?.blur();
+    try {
+      await api('POST', '/api/instagram/login', { username, password });
+      $('ig-password').value = '';
+    } catch { /* toast shown */ }
+  });
+  $('ig-session-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const sessionid = $('ig-sessionid').value.trim();
+    if (!sessionid) return;
+    document.activeElement?.blur();
+    try {
+      await api('POST', '/api/instagram/login', { sessionid });
+      $('ig-sessionid').value = '';
+    } catch { /* toast shown */ }
+  });
+  $('ig-code').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const code = $('ig-code-input').value.replace(/\s/g, '');
+    if (!code) return;
+    document.activeElement?.blur();
+    $('ig-code-input').value = '';
+    post('/api/instagram/code', { code });
+  });
+  $('ig-code-cancel').addEventListener('click', () => post('/api/instagram/code', { code: null }));
+  $('ig-logout').addEventListener('click', () => post('/api/instagram/logout'));
+}
+
 // ---------- Navigation ----------
 
+// #instagram (the TV's QR code for logging in) is a section of the settings.
 function route() {
-  const settings = location.hash === '#settings';
+  const section = location.hash === '#instagram' ? $('instagram') : null;
+  const settings = location.hash === '#settings' || !!section;
   $('remote').hidden = settings;
   $('settings').hidden = !settings;
-  window.scrollTo(0, 0);
+  if (section) section.scrollIntoView();
+  else window.scrollTo(0, 0);
 }
 
 // ---------- Start ----------
 
 buildSettings();
 bindRemote();
+bindInstagram();
 window.addEventListener('hashchange', route);
 route();
 connect();

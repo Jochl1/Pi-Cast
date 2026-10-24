@@ -3,7 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { look } from '../src/tv/screens.js';
+import { REEL, look } from '../src/tv/screens.js';
 import { scenes } from './tv-scenes.js';
 
 const [outDir = 'preview', ffmpeg = 'ffmpeg'] = process.argv.slice(2);
@@ -31,9 +31,10 @@ for (const [name, scene] of Object.entries(scenes)) {
   const events = scene.layers(t).flatMap((layer, i) => layer.map((e) => `Dialogue: ${i},0:00:00.00,0:00:05.00,Default,,0,0,0,,${e}`));
   fs.writeFileSync(path.join(outDir, `${name}.ass`), header + events.join('\n') + '\n');
   const bg = scene.video ? '0x2A3140' : t.bg.replace('#', '0x');
+  const reel = scene.reel ? `drawbox=x=${REEL.x}:y=0:w=${REEL.w}:h=1080:color=0x2A3140:t=fill,` : '';
   execFileSync(path.resolve(ffmpeg), [
     '-y', '-loglevel', 'error', '-f', 'lavfi', '-i', `color=c=${bg}:s=1920x1080:d=1`,
-    '-vf', `ass=${name}.ass:fontsdir=fonts`, '-frames:v', '1', `${name}.png`,
+    '-vf', `${reel}ass=${name}.ass:fontsdir=fonts`, '-frames:v', '1', `${name}.png`,
   ], { stdio: 'inherit', cwd: outDir });
   console.log('rendered', name);
 }

@@ -12,6 +12,7 @@ const LAYERS = {
   home: { id: 2, z: 1 },
   loading: { id: 7, z: 2 },
   dots: { id: 8, z: 3 },
+  reels: { id: 9, z: 4 },
   popup: { id: 3, z: 5 },
   pause: { id: 4, z: 6 },
   panel: { id: 5, z: 8 },
@@ -26,15 +27,21 @@ const DOTS_CYCLE_MS = 1200;
 // Short stalls don't get the buffering card.
 const BUFFERING_MS = 1000;
 const UNHOLD_MS = 400;
+// The big heart after a like fades out over this long.
+const PULSE_MS = 700;
 
 /**
  * Everything drawn on the TV: home screen, loading, now-playing pop-ups,
- * pause screen, settings panel and toasts. Redraws only when something
+ * pause screen, settings panel, Reels and toasts. Redraws only when something
  * visible changes, since every redraw costs CPU on a Pi 3.
  */
 export default class Tv {
-  constructor({ mpv, playback, cast, settings, sounds, log, remote }) {
-    Object.assign(this, { mpv, playback, cast, settings, sounds, log, remote });
+  constructor({
+    mpv, playback, cast, settings, sounds, reels, log, remote,
+  }) {
+    Object.assign(this, {
+      mpv, playback, cast, settings, sounds, reels, log, remote,
+    });
     this.sent = {};
     this.panel = { open: false, focus: 0 };
     this.card = null; // { until, quality }
@@ -78,6 +85,7 @@ export default class Tv {
       this.render();
     });
     cast.on('change', () => this.render());
+    this.reels.on('change', () => this.render());
     settings.on('change', () => {
       this.#updateBackdrop();
       this.render();
@@ -89,10 +97,11 @@ export default class Tv {
     this.render();
   }
 
-  /** 'home' | 'loading' | 'buffering' | 'playing' | 'paused' */
+  /** 'home' | 'loading' | 'buffering' | 'playing' | 'paused' | 'reels' */
   screen() {
     const p = this.mpv.props;
     const { source, loading, background } = this.playback;
+    if (this.reels.active) return 'reels';
     if (!source) return 'home';
     if (p['idle-active'] || background.showing || loading) return 'loading';
     if (p.pause) return 'paused';
@@ -176,6 +185,7 @@ export default class Tv {
 
   async #onStarted() {
     const { mpv } = this;
+    if (this.reels.active) return; // Reels show their own info
     let quality = null;
     try {
       const [height, fps] = await Promise.all([mpv.get('height'), mpv.get('container-fps').catch(() => null)]);
@@ -238,9 +248,11 @@ export default class Tv {
 
     // The home screen's backdrop is mpv's own background color: a full-screen
     // overlay would take half of the Pi 3's overlay texture (see screens.js).
-    await this.#setBackground(onHome || screen === 'loading' ? t.bg : '#000000');
+    await this.#setBackground(onHome || screen === 'loading' || screen === 'reels' ? t.bg : '#000000');
 
-    const layers = { home: null, loading: null, popup: null, pause: null, panel: null, toast: null };
+    const layers = {
+      home: null, loading: null, reels: null, popup: null, pause: null, panel: null, toast: null,
+    };
     const sender = status.owner === 'cast' ? this.cast.senders()[0] : null;
     if (overVideo) {
       layers.loading = screens.loadingOverVideo(t, screen === 'buffering' ? 'buffering' : 'loading', { ...status, sender });
@@ -267,6 +279,14 @@ export default class Tv {
     if (this.sender) popup.push(...screens.senderPill(t, this.sender.name, fade(this.sender.until)));
     if (popup.length) layers.popup = popup;
     if (screen === 'paused') layers.pause = screens.paused(t, status);
+    const pulse = screen === 'reels' ? 1 - (now - this.reels.likedAt) / PULSE_MS : 0;
+    if (screen === 'reels') {
+      layers.reels = screens.reels(t, {
+        reel: this.reels.current,
+        paused: !!status.url && !status.loading && !!p.pause,
+        pulse: Math.max(0, pulse),
+      });
+    }
     if (this.panel.open) {
       const ids = Object.keys(ACCENTS);
       if (s.accent === 'custom') ids.push('custom');
@@ -291,7 +311,10 @@ export default class Tv {
         if (!this.panel.open) this.playback.holdBackground('panel', false);
       }, UNHOLD_MS);
     }
-    this.#animateDots(screen === 'loading' || screen === 'buffering' ? t : null);
+    // Reels: the dots sit in the middle, where the next Reel will be.
+    const reelLoading = screen === 'reels' && (!this.reels.current || status.loading);
+    this.#animateDots(screen === 'loading' || screen === 'buffering' || reelLoading ? t : null,
+      screen === 'reels' ? screens.H / 2 : undefined);
 
     // Thumbnail: only while the card is fully visible (bitmaps can't fade).
     const thumb = this.card && fade(this.card.until) >= 1 ? this.thumb.want : null;
@@ -300,16 +323,19 @@ export default class Tv {
     // Wake up again for fades and expiries.
     const deadlines = [this.card?.until, this.sender?.until, this.message?.until].filter(Boolean);
     clearTimeout(this.timer);
-    if (deadlines.length) {
+    if (pulse > 0) {
+      this.timer = setTimeout(() => this.render(), 120);
+    } else if (deadlines.length) {
       const next = Math.min(...deadlines);
       const wait = next - now > FADE_MS ? next - now - FADE_MS : 120;
       this.timer = setTimeout(() => this.render(), wait);
     }
   }
 
-  /** Keeps the loading dots pulsing while `t` is set; clears them otherwise. */
-  #animateDots(t) {
+  /** Keeps the loading dots pulsing while `t` is set, at height `y`; clears them otherwise. */
+  #animateDots(t, y) {
     this.dotsTheme = t;
+    this.dotsY = y;
     if (!t) {
       clearInterval(this.dotsTimer);
       this.dotsTimer = null;
@@ -318,7 +344,7 @@ export default class Tv {
     }
     const tick = () => {
       const phase = (Date.now() % DOTS_CYCLE_MS) / DOTS_CYCLE_MS;
-      this.#send('dots', screens.dots(this.dotsTheme, phase).join('\n'));
+      this.#send('dots', screens.dots(this.dotsTheme, phase, screens.W / 2, this.dotsY).join('\n'));
     };
     if (!this.dotsTimer) {
       tick();

@@ -2,6 +2,7 @@
 // (fit test on the Pi). Each scene's layers are lists of ASS events, in the
 // same stacking order the app uses. Scenes without `video` sit on the
 // background color, which mpv draws itself (the app shows a backdrop image there).
+// `reel` scenes get a stand-in for the upright Reel in the previews.
 import QRCode from 'qrcode';
 import { ACCENTS } from '../src/shared/theme.js';
 import * as screens from '../src/tv/screens.js';
@@ -23,6 +24,12 @@ const video = {
   position: 724, duration: 1907, live: false,
 };
 const toastText = "Couldn't play that link";
+const reel = {
+  user: 'kitchen.stories.daily',
+  caption: 'Three-ingredient pasta in 10 minutes 🍝🔥 Save this for later! Recipe: 200 g spaghetti, 2 cloves of garlic, olive oil, chili flakes and a lot of parmesan #pasta #recipe #quickdinner #foodtok',
+  likes: 48213,
+  liked: false,
+};
 const swatches = Object.entries(ACCENTS).map(([id, a]) => ({ id, hex: a.hex, selected: id === 'violet' }));
 
 export const scenes = {
@@ -71,11 +78,21 @@ export const scenes = {
     layers: (t) => [screens.home(t, { ...homeState, panelOpen: true }),
       screens.settingsPanel(t, { settings: de, focus: 1, swatches }), screens.toast(t, t.tr('couldntPlay'))],
   },
+  reels: { settings: base, reel: true, layers: (t) => [screens.reels(t, { reel })] },
+  'reels-loading': { settings: base, layers: (t) => [screens.reels(t, { reel: null }), screens.dots(t, 0.3, screens.W / 2, screens.H / 2)] },
+  'reels-de-liked': {
+    settings: de, reel: true,
+    layers: (t) => [screens.reels(t, { reel: { ...reel, liked: true, likes: 48214, caption: 'Kurz' }, pulse: 0.8 })],
+  },
   // Worst cases: the biggest screens with a toast on top.
   'buffering+popup+toast': {
     settings: base, video: true,
     layers: (t) => [screens.loadingOverVideo(t, 'BUFFERING', video), screens.dots(t, 0),
       screens.senderPill(t, 'iPhone'), screens.toast(t, toastText)],
+  },
+  'reels-paused+like+toast': {
+    settings: de, reel: true,
+    layers: (t) => [screens.reels(t, { reel, paused: true, pulse: 1 }), screens.toast(t, t.tr('reelsLoggedOut'))],
   },
   'paused+toast': { settings: base, video: true, layers: (t) => [screens.paused(t, video), screens.toast(t, toastText)] },
   'settings+toast': {

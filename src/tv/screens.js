@@ -1,7 +1,7 @@
 import { themeFor } from '../shared/theme.js';
 import { LANGUAGES, translator } from '../shared/i18n.js';
 import {
-  text, span, rect, circle, arcBand, escape, fit, textWidth, qrShape,
+  text, span, rect, circle, shape, arcBand, escape, fit, textWidth, qrShape,
 } from './ass.js';
 
 /**
@@ -24,7 +24,7 @@ const PAD_X = 96;
 const PAD_Y = 84;
 // Colors used over video, from the design.
 const ON_VIDEO = { text: '#F2F4F7', muted: '#B4BCC8', track: 'rgba(255,255,255,0.2)', dim: 'rgba(6,8,12,0.62)' };
-const SOURCE = { youtube: 'YouTube', twitch: 'Twitch' };
+const SOURCE = { youtube: 'YouTube', twitch: 'Twitch', instagram: 'Instagram' };
 const source = (t, kind) => SOURCE[kind] ?? t.tr('link');
 
 /** Colors and texts for `settings`: themeFor() plus tr (see i18n.js). */
@@ -346,6 +346,113 @@ export function toast(t, message, dot = null) {
     text(label, { x: W / 2 + lead / 2, y: H - 120 - h / 2, an: 5, px: 39, color: t.text }),
   ];
   if (dot) events.push(circle(x + 54 + 12, H - 120 - h / 2, 12, { color: dot }));
+  return events;
+}
+
+// --- Instagram Reels ---
+
+/** Where mpv shows an upright 9:16 Reel: full height, centred. */
+export const REEL = { x: Math.round((W - (H * 9) / 16) / 2), w: Math.round((H * 9) / 16) };
+const REEL_SIDE = { left: PAD_X, right: REEL.x + REEL.w + 64, w: REEL.x - 64 - PAD_X };
+
+/** A heart, `size` px wide, with its top left at (x, y). */
+export function heart(x, y, size, opts = {}) {
+  const k = size / 100;
+  const pts = [50, 92, 22, 72, 0, 54, 0, 30, 0, 13, 13, 0, 30, 0, 40, 0, 47, 5, 50, 13,
+    53, 5, 60, 0, 70, 0, 87, 0, 100, 13, 100, 30, 100, 54, 78, 72, 50, 92].map((v) => Math.round(v * k * 10) / 10);
+  const [mx, my, ...curves] = pts;
+  const b = [];
+  for (let i = 0; i < curves.length; i += 6) b.push(`b ${curves.slice(i, i + 6).join(' ')}`);
+  return shape(`m ${mx} ${my} ${b.join(' ')}`, { ...opts, x, y });
+}
+
+/** libass has no emoji font: drop emoji, flags and joiners, and fold line breaks. */
+const plain = (s) => String(s ?? '')
+  .replace(/[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{1F3FB}-\u{1F3FF}\u{FE0F}\u{200D}]/gu, '')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+/** Splits text into at most `maxLines` lines of roughly `maxW` px; the last one ends in … if cut. */
+function wrap(s, px, maxW, maxLines, avg = 0.52) {
+  const max = Math.max(8, Math.floor(maxW / (px * avg)));
+  const lines = [];
+  let line = '';
+  for (const word of s.split(' ')) {
+    const next = line ? `${line} ${word}` : word;
+    if (next.length <= max) {
+      line = next;
+      continue;
+    }
+    if (line) lines.push(line);
+    line = word.length > max ? `${word.slice(0, max - 1)}…` : word;
+    if (lines.length === maxLines) break;
+  }
+  if (line && lines.length < maxLines) lines.push(line);
+  if (lines.length === maxLines && lines.join(' ').length < s.length) lines[maxLines - 1] = fit(`${lines[maxLines - 1]}…`, px, maxW, avg);
+  return lines;
+}
+
+const compact = (n, locale) => new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 }).format(n);
+
+/**
+ * Reels: the Reel itself is mpv's video in the middle (REEL), with the
+ * background color on both sides. Left: the title and the keys. Right: who
+ * posted it, the caption and the likes. `reel` = { user, caption, likes,
+ * liked } or null while the first page loads; `pulse` (0..1) fades the big
+ * heart after a like; `paused` shows the pause ring.
+ */
+export function reels(t, { reel, paused: isPaused, pulse = 0 }) {
+  const { left, right, w } = REEL_SIDE;
+  const events = [
+    text('INSTAGRAM', { x: left, y: PAD_Y, px: 30, weight: 600, spacing: 3.6, color: t.accent }),
+    text(t.tr('reelsTitle'), { x: left, y: PAD_Y + 44, px: 72, weight: 600, spacing: -1.5, color: t.text }),
+  ];
+
+  const keys = [['▲ ▼', 'reelsKeyScroll'], ['OK', 'reelsKeyLike'], ['◀ ▶', 'reelsKeySeek'], [t.tr('reelsKeyBack'), 'reelsKeyHome']];
+  keys.forEach(([key, label], i) => {
+    const y = H - PAD_Y - (keys.length - 1 - i) * 56;
+    events.push(
+      text(escape(key), { x: left, y, an: 1, px: 30, weight: 600, color: t.text }),
+      text(t.tr(label), { x: left + 150, y, an: 1, px: 30, color: t.muted }),
+    );
+  });
+
+  if (reel) {
+    // Bottom up: likes, caption, user.
+    const likeH = 48;
+    const likeY = H - PAD_Y - likeH;
+    events.push(heart(right, likeY + 2, 50, reel.liked
+      ? { color: t.accent }
+      : { color: t.text, opacity: 0, border: 3.5, borderColor: t.text }));
+    if (reel.likes != null) {
+      events.push(text(compact(reel.likes, t.tr.locale), {
+        x: right + 50 + 24, y: likeY + likeH / 2, an: 4, px: 36, weight: 600, color: reel.liked ? t.accent : t.text,
+      }));
+    }
+    const lines = wrap(plain(reel.caption), 30, w, 4);
+    const lineH = 44;
+    const capTop = likeY - 48 - lines.length * lineH;
+    lines.forEach((line, i) => events.push(text(escape(line), { x: right, y: capTop + i * lineH, px: 30, color: t.muted })));
+    if (reel.user) {
+      events.push(text(escape(fit(`@${reel.user}`, 42, w, 0.56)), {
+        x: right, y: capTop - (lines.length ? 24 : 0) - 58, px: 42, weight: 600, color: t.text,
+      }));
+    }
+  }
+
+  const cx = W / 2;
+  const cy = H / 2;
+  if (isPaused) {
+    events.push(
+      circle(cx, cy, 102, { color: ON_VIDEO.dim, border: 6, borderColor: t.accent }),
+      rect(cx - 12 - 18, cy - 36, 18, 72, { color: t.accent, radius: 6 }),
+      rect(cx + 12, cy - 36, 18, 72, { color: t.accent, radius: 6 }),
+    );
+  }
+  if (pulse > 0) {
+    const size = 240 + 40 * (1 - pulse);
+    events.push(heart(cx - size / 2, cy - size * 0.46, size, { color: t.accent, opacity: pulse }));
+  }
   return events;
 }
 

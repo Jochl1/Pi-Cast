@@ -4,6 +4,7 @@ An ad-free "Chromecast" for a Raspberry Pi 3. It shows up as a cast target in th
 
 - **YouTube:** cast from the YouTube app. Videos are fetched directly with yt-dlp, so YouTube ads never play. Sponsor segments are skipped with SponsorBlock.
 - **Twitch and other links:** paste them into the web app, or use Share → **Send to Pi-Cast**. streamlink filters out Twitch's ad breaks.
+- **Instagram Reels:** scroll through the Reels tab on the TV with the remote's arrow keys and like with OK. Use a second account: this goes through Instagram's private app API, which Instagram doesn't allow, so the account can get locked.
 - **TV:** animated boot splash, a home screen with a clock, now-playing pop-ups, a pause screen and a settings panel. Soft menu sounds and an optional startup sound. No Linux text on screen.
 
 What it can't do: Netflix or other DRM services, and casting from the Twitch app (Google only allows certified Cast devices).
@@ -33,7 +34,7 @@ sudo reboot
 
 The installer takes 10–20 minutes on a Pi 3. You can run it again at any time, for example after a `git pull`. It skips what's already done, and it backs up every system file it changes to `/var/backups/picast/`.
 
-What it sets up: mpv, ffmpeg, Node.js 22, yt-dlp and streamlink (in `.venv/`), the fonts, the SponsorBlock script, a `picast` service that starts at boot, a daily yt-dlp/streamlink update (YouTube breaks old versions regularly), Wi-Fi power saving turned off, and the boot splash.
+What it sets up: mpv, ffmpeg, Node.js 22, yt-dlp, streamlink and instagrapi (in `.venv/`), the fonts, the SponsorBlock script, a `picast` service that starts at boot, a daily yt-dlp/streamlink update (YouTube breaks old versions regularly), Wi-Fi power saving turned off, and the boot splash.
 
 **Optional: the drifting home background.** The Pi paints a still background itself. The animated one is a set of video loops, one per accent color, too slow to make on a Pi 3. Render them on a computer with Node.js and ffmpeg (about 20 s and 50 MB each), then copy them over:
 
@@ -52,6 +53,12 @@ Pi-Cast picks them up the next time it starts or the accent changes, while "Anim
 2. Tap **Share → Add to Home Screen**.
 
 You get the remote (play/pause, ±10 s, volume, "Play a link", Recent) and all settings (accent color, animations, sounds, language (English/German), device name, Twitch quality, SponsorBlock, clock, TV remote options, including sleeping while the TV is off).
+
+### Instagram
+
+In the web app, open Settings → Instagram and log in. If Instagram sends a security code, a box for it appears. pi-cast keeps the session in `data/instagram.json`, never the password.
+
+Logging in with a password often fails at the moment with "your version of Instagram is out of date" (an [instagrapi bug](https://github.com/subzeroid/instagrapi/issues/2807)). Then use **Login not working?**: log in on instagram.com in a browser on a computer, open the developer tools (F12) → Application → Cookies → `https://www.instagram.com`, and paste the value of `sessionid`. Don't log out in that browser afterwards, or the session ends.
 
 ### "Send to Pi-Cast" in the share sheet
 
@@ -79,14 +86,14 @@ Tap **Cast** in the YouTube app and pick **Pi-Cast** (or the name you set). If i
 
 TV remote keys:
 
-| Key | Home screen | Settings panel | During playback |
-|---|---|---|---|
-| OK | open settings | change value | play / pause |
-| ◀ ▶ | | change value | −10 s / +10 s |
-| ▲ ▼ | | move between rows | |
-| Back | | close | stop |
-| Play, Pause, Stop, ⏪ ⏩ | | | what they say |
-| Red, green, yellow, blue | play that key's favourite | play that key's favourite | switch to that key's favourite |
+| Key | Home screen | Settings panel | During playback | Instagram Reels |
+|---|---|---|---|---|
+| OK | open settings | change value | play / pause | like / unlike |
+| ◀ ▶ | | change value | −10 s / +10 s | −5 s / +5 s |
+| ▲ ▼ | ▲ opens Instagram Reels | move between rows | | previous / next Reel |
+| Back | | close | stop | back to home |
+| Play, Pause, Stop, ⏪ ⏩ | | | what they say | what they say |
+| Red, green, yellow, blue | play that key's favourite | play that key's favourite | switch to that key's favourite | switch to that key's favourite |
 
 The colour-key favourites are set in the web app under Settings → Colour keys (red is Trymacs and green is BigSpin by default). Number keys would have been nicer, but the DYON TV doesn't send them over CEC.
 

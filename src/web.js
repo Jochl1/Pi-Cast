@@ -8,7 +8,7 @@ const ICON_SIZES = [180, 192, 512];
 
 /** Web app + JSON API. Live state goes out over SSE at /api/events. */
 export default function createWebServer({
-  playback, controls, settings, recent, events, tv, getStatus, getTheme, log,
+  playback, controls, settings, recent, events, remoteKey, instagram, getStatus, getTheme, log,
 }) {
   const app = express();
   app.disable('x-powered-by');
@@ -67,7 +67,19 @@ export default function createWebServer({
   app.post('/api/volume', action((body) => controls.setVolume(body)));
 
   // Same keys as the TV remote; handy for testing without HDMI-CEC.
-  app.post('/api/tv/key', action(({ key }) => ({ ok: true, handled: tv.key(String(key)) })));
+  app.post('/api/tv/key', action(({ key }) => ({ ok: true, handled: remoteKey(String(key)) })));
+
+  // Instagram login. The outcome arrives over SSE ('instagram'), since a login
+  // can wait minutes for the security code.
+  app.get('/api/instagram', (req, res) => res.json(instagram.state));
+  app.post('/api/instagram/login', action(({ username, password, sessionid }) => {
+    const filled = (v) => typeof v === 'string' && v.trim().length > 0;
+    if (filled(sessionid)) return instagram.login({ sessionid });
+    if (!filled(username) || !filled(password)) throw badRequest('username and password required');
+    return instagram.login({ username, password });
+  }));
+  app.post('/api/instagram/code', action(({ code }) => instagram.code(typeof code === 'string' ? code : null)));
+  app.post('/api/instagram/logout', action(() => instagram.logout()));
 
   // Icons follow the current accent.
   const sendIcon = (size) => async (req, res) => {

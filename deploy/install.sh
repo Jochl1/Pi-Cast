@@ -108,10 +108,10 @@ install_node() {
 }
 
 install_app() {
-  say "Installing yt-dlp and streamlink into $REPO/.venv"
+  say "Installing yt-dlp, streamlink and instagrapi into $REPO/.venv"
   [[ -x "$REPO/.venv/bin/pip" ]] || python3 -m venv "$REPO/.venv"
   "$REPO/.venv/bin/pip" install -q -U pip
-  "$REPO/.venv/bin/pip" install -U "yt-dlp[default]" streamlink
+  "$REPO/.venv/bin/pip" install -U "yt-dlp[default]" streamlink instagrapi
 
   say "Installing Node packages"
   (cd "$REPO" && npm ci --omit=dev --no-audit --no-fund)

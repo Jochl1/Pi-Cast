@@ -6,16 +6,18 @@ import { edl } from './ytdl.js';
 // mpv restarts the hardware decoder on every loop-file seek, which flashes
 // the whole screen black on a Pi 3. The clip repeated back to back in an EDL
 // plays on without that (one segment to the next), and wraps around hourly.
+// mpv opens a file that's repeated in an EDL only once, so this works for
+// URLs too (Reels loop the same way).
 const CLIP_REPEATS = 120;
-const seamless = (file) => (file.endsWith('.mp4')
-  ? `edl://${Array(CLIP_REPEATS).fill(`%${Buffer.byteLength(file)}%${file}`).join(';')}`
-  : file);
+const repeated = (file, n = CLIP_REPEATS) => `edl://${Array(n).fill(`%${Buffer.byteLength(file)}%${file}`).join(';')}`;
+const seamless = (file) => (file.endsWith('.mp4') ? repeated(file) : file);
 
 /**
  * Single owner of what's on screen. Both the cast receiver and the web UI go
  * through here, so they never fight over mpv.
  *
- * owner: 'cast' (YouTube app session) | 'web' (web UI / share) | null
+ * owner: 'cast' (YouTube app session) | 'web' (web UI / share) |
+ *        'instagram' (Reels, see reels.js) | null
  *
  * Events:
  *  'takeover' (previousOwner) - someone else started playing
@@ -185,14 +187,21 @@ export default class Playback extends EventEmitter {
     this.emit('change');
   }
 
-  async play(url, { owner, start = 0 }) {
-    const kind = classify(url);
+  /**
+   * `info` = { kind, title, channel, thumbnail } when the caller already knows
+   * them (Reels): no lookup, and `url` is played as it is. `loop` repeats it
+   * without a black flash between rounds.
+   */
+  async play(url, {
+    owner, start = 0, info = null, loop = false,
+  }) {
+    const kind = info?.kind ?? classify(url);
     const previous = this.owner;
     this.switching = true;
     this.timing = { request: Date.now() };
     this.loading = true;
     this.owner = owner;
-    const source = { url, kind, title: null, channel: null, thumbnail: null };
+    const source = { url, kind, title: null, channel: null, thumbnail: null, ...info };
     this.source = source;
     if (previous && previous !== owner) this.emit('takeover', previous);
     this.emit('play', { owner, url, kind });
@@ -205,7 +214,7 @@ export default class Playback extends EventEmitter {
     this.log.info(`play [${owner}/${kind}] ${url}${start ? ` @${start}s` : ''}`);
 
     // Fetched in parallel with loading; shown as soon as it arrives.
-    const meta = lookup(url, kind).then((m) => {
+    const meta = info ? Promise.resolve() : lookup(url, kind).then((m) => {
       if (this.source !== source) return;
       Object.assign(source, m);
       this.emit('change');
@@ -236,6 +245,9 @@ export default class Playback extends EventEmitter {
             ...(id ? [`Referer: https://www.youtube.com/watch?v=${id}`] : []),
           ];
           await this.mpv.load(edl(direct.video.url, direct.audio?.url), { start, title: direct.title ?? source.title ?? '', headers });
+        } else if (loop) {
+          // 60 rounds without a flash, then mpv loops the whole EDL.
+          await this.mpv.load(repeated(url, 60), { start, title: source.title ?? '', loop: true });
         } else {
           await this.mpv.load(url, { start });
         }
@@ -274,6 +286,9 @@ export default class Playback extends EventEmitter {
   status() {
     const p = this.mpv.props;
     const s = this.source;
+    // A looped item (Reels) knows its own length; mpv sees all the rounds.
+    const round = s?.duration || 0;
+    const position = s ? p['time-pos'] ?? 0 : 0;
     return {
       owner: this.owner,
       kind: s?.kind ?? null,
@@ -286,8 +301,8 @@ export default class Playback extends EventEmitter {
       loading: !!s && (this.loading || !!p['paused-for-cache']),
       paused: !!s && !this.loading && !!p.pause, // play() holds the old picture still while loading
       live: s?.kind === 'twitch',
-      position: s ? p['time-pos'] ?? 0 : 0,
-      duration: s ? p.duration ?? 0 : 0,
+      position: round ? position % round : position,
+      duration: round || (s ? p.duration ?? 0 : 0),
       volume: Math.round(p.volume ?? 100),
       muted: !!p.mute,
     };

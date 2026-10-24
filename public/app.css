@@ -231,6 +231,15 @@ input[type="range"] { flex-grow: 1; accent-color: var(--accent); height: 28px; }
 }
 .switch[aria-pressed="true"] span { background: var(--accent); }
 .switch[aria-pressed="true"] span::after { transform: translateX(18px); }
+.row-btn {
+  width: 100%; border: 0; background: transparent;
+  justify-content: center; color: var(--accent); font-weight: 600;
+}
+.row-btns { justify-content: flex-end; gap: 20px; }
+.ig-session[hidden] { display: none; }
+.ig-session summary { font-size: 14px; color: var(--accent); cursor: pointer; }
+.ig-session[open] summary { margin-bottom: 10px; }
+.ig-session .hint { margin-bottom: 10px; }
 .hint { margin: 0; font-size: 13px; line-height: 1.5; color: var(--muted); }
 
 /* --- Toast --- */
