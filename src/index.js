@@ -4,6 +4,7 @@ import { loadConfig, DATA_DIR } from './config.js';
 import { createLogger } from './log.js';
 import Mpv from './mpv.js';
 import Streamlink from './streamlink.js';
+import Ytdl from './ytdl.js';
 import Playback from './playback.js';
 import Cast from './cast.js';
 import Settings, { streamlinkQuality } from './settings.js';
@@ -28,7 +29,8 @@ const getTheme = () => themeFor(settings.get());
 const mpv = new Mpv(config, log);
 mpv.scriptFilter = (file) => !file.startsWith('sponsorblock') || settings.get().sponsorBlock;
 const streamlink = new Streamlink(config, log);
-const playback = new Playback(mpv, streamlink, log, {
+const ytdl = new Ytdl(config, log);
+const playback = new Playback(mpv, streamlink, ytdl, log, {
   getTwitchQuality: () => streamlinkQuality(settings.get().twitchQuality),
 });
 const cast = new Cast({
@@ -147,6 +149,7 @@ if (settings.get().cecEnabled) cec.start();
 // --- Start ---
 // Doesn't wait for mpv: it retries in the background if it can't start.
 mpv.start();
+ytdl.start();
 await cast.start(settings.get().deviceName);
 
 const web = createWebServer({
@@ -159,6 +162,7 @@ web.listen(config.webPort, () => {
 async function shutdown() {
   log.info('shutting down');
   cec.stop();
+  ytdl.stop();
   await streamlink.close();
   await cast.stop();
   await mpv.shutdown();

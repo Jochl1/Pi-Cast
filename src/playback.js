@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { classify } from './sources.js';
-import { lookup } from './metadata.js';
+import { lookup, youtubeId } from './metadata.js';
+import { edl } from './ytdl.js';
 
 /**
  * Single owner of what's on screen. Both the cast receiver and the web UI go
@@ -17,10 +18,11 @@ import { lookup } from './metadata.js';
  */
 export default class Playback extends EventEmitter {
   /** `getTwitchQuality` returns the streamlink quality list to use for the next stream. */
-  constructor(mpv, streamlink, log, { getTwitchQuality }) {
+  constructor(mpv, streamlink, ytdl, log, { getTwitchQuality }) {
     super();
     this.mpv = mpv;
     this.streamlink = streamlink;
+    this.ytdl = ytdl;
     this.log = log;
     this.getTwitchQuality = getTwitchQuality;
     this.owner = null;
@@ -113,8 +115,29 @@ export default class Playback extends EventEmitter {
         await this.mpv.load(local, { title: source.title ?? url });
         this.#mark('loadfile');
       } else {
+        let direct = null;
+        if (kind === 'youtube') {
+          // Resolving takes seconds: show the loading screen, not the old video under it.
+          if (!this.mpv.props['idle-active']) await this.mpv.stop().catch(() => {});
+          direct = await this.#resolve(url);
+        }
+        if (this.source !== source) {
+          // Replaced or stopped while yt-dlp was busy.
+          if (!this.source) this.switching = false;
+          return;
+        }
         // Load first, then drop any old Twitch stream, so its EOF lands as a 'stop'.
-        await this.mpv.load(url, { start });
+        if (direct) {
+          // The Referer lets the SponsorBlock script find the video ID.
+          const id = youtubeId(url);
+          const headers = [
+            ...Object.entries(direct.video.headers).map(([k, v]) => `${k}: ${v}`),
+            ...(id ? [`Referer: https://www.youtube.com/watch?v=${id}`] : []),
+          ];
+          await this.mpv.load(edl(direct.video.url, direct.audio?.url), { start, title: direct.title ?? source.title ?? '', headers });
+        } else {
+          await this.mpv.load(url, { start });
+        }
         this.#mark('loadfile');
         await this.streamlink.close();
       }
@@ -125,6 +148,18 @@ export default class Playback extends EventEmitter {
       await this.streamlink.close();
       await this.mpv.stop().catch(() => {});
       throw e;
+    }
+  }
+
+  /** Direct stream URLs from the yt-dlp worker, or null to let mpv's ytdl hook do it. */
+  async #resolve(url) {
+    try {
+      const direct = await this.ytdl.resolve(url);
+      this.#mark('resolved');
+      return direct;
+    } catch (e) {
+      this.log.warn(`yt-dlp worker: ${e.message}; letting mpv resolve ${url}`);
+      return null;
     }
   }
 

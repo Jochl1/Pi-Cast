@@ -71,6 +71,7 @@ Node 22 (ESM), with `express` and `yt-cast-receiver` as the only dependencies an
 | `playback.js` | Single owner of the screen (see below). |
 | `cast.js`, `castPlayer.js` | YouTube cast receiver and its `Player` subclass. |
 | `receiverStore.js` | The receiver's data store (replaces node-persist). |
+| `ytdl.js` | yt-dlp worker that stays running: YouTube link to direct stream URLs. |
 | `streamlink.js` | Runs streamlink for Twitch and returns the local HTTP URL. |
 | `sources.js`, `metadata.js` | Link classification; quick title/channel/thumbnail lookup (YouTube oEmbed, Twitch from the URL). |
 | `controls.js` | Play/pause/seek/volume for the web app and the TV remote. |
@@ -96,9 +97,19 @@ Node 22 (ESM), with `express` and `yt-cast-receiver` as the only dependencies an
 
 ### YouTube
 
-- mpv's ytdl hook with yt-dlp from `.venv` (`yt-dlp[default]`, which includes `yt-dlp-ejs`).
-- Format: H.264 (avc1) at 1080p30 or lower, with AAC audio. VP9 and AV1 can't be hardware-decoded on a Pi 3.
-- yt-dlp needs a JS runtime for YouTube's challenges: `ytdl-raw-options-append=js-runtimes=node`. Node ≥ 22 from NodeSource only exists for arm64, so the Pi must run the **64-bit** OS.
+- yt-dlp comes from `.venv` (`yt-dlp[default]`, which includes `yt-dlp-ejs`).
+- Format (`ytdlFormat` in `config.js`, also passed to mpv): H.264 (avc1) at 1080p30 or lower, with AAC audio. VP9 and AV1 can't be hardware-decoded on a Pi 3.
+- yt-dlp needs a JS runtime for YouTube's challenges: `js-runtimes=node`. Node ≥ 22 from NodeSource only exists for arm64, so the Pi must run the **64-bit** OS.
+- **The yt-dlp worker** (`src/ytdl.js` and `bin/ytdl.py worker`) is a Python process that stays running and resolves YouTube links to direct stream URLs.
+  - Playback stops the old video, asks the worker, and loads an `edl://` that joins the video and audio streams, with yt-dlp's HTTP headers.
+  - The `Referer` header carries the `watch?v=` link, which is how the SponsorBlock script finds the video ID.
+  - Results are cached for 20 minutes, so casting the same video again starts in about 1 s.
+  - If the worker fails, mpv's own ytdl hook resolves the link instead. The hook also handles every non-YouTube site, through `bin/yt-dlp`.
+- **Why it's fast now:** for every video, yt-dlp hands YouTube's ~4 MB player script to Node to solve the JS challenge. Parsing it took about 20 s on a throttled Pi 3, and starting Python and yt-dlp took about 6 s more.
+  - `bin/ytdl.py` turns on yt-dlp's preprocessed-player cache, which yt-dlp keeps off by default because it never deletes old players. So `bin/ytdl.py` keeps only the newest two.
+  - With the cache, solving takes 2–4 s. The worker saves the start-up.
+  - Measured at 600 MHz: request to first frame went from about 31 s to about 7 s. The first video after YouTube ships a new player script still pays the full parse once.
+  - Tried and rejected: clients that need no JS challenge (`android_vr`, `ios`). They need a PO token and only give 360p. Smaller player variants only saved a few seconds.
 - A daily `picast-update.timer` upgrades yt-dlp and streamlink, because YouTube breaks old versions regularly.
 
 ### Cast receiver (`yt-cast-receiver` 2.x)
@@ -188,9 +199,9 @@ The Pi 3 throttles from 1200 to 600 MHz on undervoltage (`vcgencmd get_throttled
 
 ## 5. Open work
 
-- **Slow start and a black screen while loading.** Casting takes 30–60 s before the video plays, and the TV is black the whole time.
-  - Likely cause of the black screen: `Playback` clears `switching` on `start-file`, which fires before the ytdl hook has resolved the URL. `Tv.screen()` then reports `'playing'`.
-  - The slowness isn't measured yet. Suspects: yt-dlp startup on a throttled CPU, the Node JS-challenge solver, a second yt-dlp call for the merged format, and the cache settings before the first frame.
+- **Faster YouTube start.** What's left of the ~7 s is mostly network (~1.5 s) and Node solving the challenge (2–4 s).
+  - Options: a Node solver that stays running instead of one Node per video; resolving the next queued video ahead of time.
+  - A proper power supply is likely the biggest single win.
 - **Bland home screen.** Without the glows, Aurora is a plain dark colour. Options within §4.2:
   - a pre-rendered background image on the free video plane while idle;
   - finding out why the OSD-text texture route didn't show;

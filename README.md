@@ -103,7 +103,7 @@ Settings from the web app are stored in `data/settings.json`. Lower-level option
 
 - **Power supply:** use the official Raspberry Pi 5.1 V / 2.5 A supply. Weaker ones cause undervoltage, which halves the CPU speed (slow video starts) and corrupts SD card writes. `vcgencmd get_throttled` should print `throttled=0x0`; anything else means the Pi has been short on power since boot.
 - **Installer stops with "undervoltage":** see above. `PICAST_IGNORE_POWER=1 ./deploy/install.sh` skips the check.
-- **Videos take a while to start:** 30–60 s from tapping Cast is normal for now on a Pi 3 (yt-dlp is slow on it, slower still on low power). This is being worked on.
+- **Videos take a while to start:** a YouTube video takes about 5–10 s on a Pi 3, and longer on low power. After YouTube updates its player (every few days), the first video takes about 30 s once.
 - **Pi doesn't boot, green LED blinks 7 times:** the kernel on the SD card is damaged. The installer checks this before you reboot. If it happens anyway, the SD card is usually faulty.
 - **TV black but showing a signal:** turn the TV off and on once.
 - **Logs:** `journalctl -u picast -f`. Use `"logLevel": "debug"` for mpv/streamlink/CEC details.

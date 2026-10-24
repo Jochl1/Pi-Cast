@@ -28,6 +28,8 @@ const defaults = {
   mpvAudioDevice: 'alsa/hdmi:CARD=vc4hdmi,DEV=0',
   mpvExtraArgs: [],
 
+  // YouTube: H.264 (avc1) at 1080p30 max; the Pi 3 can't hardware-decode VP9/AV1.
+  ytdlFormat: 'bestvideo[vcodec^=avc1][height<=?1080][fps<=?30]+bestaudio[acodec^=mp4a]/best[vcodec^=avc1][height<=?1080]/best[height<=?720]',
   // bin/yt-dlp runs the venv's yt-dlp with its player cache on (much faster on a Pi 3).
   ytdlPath: fs.existsSync(path.join(ROOT, '.venv', 'bin', 'python')) ? path.join(ROOT, 'bin', 'yt-dlp') : 'yt-dlp',
   streamlinkPath: venvBin('streamlink'),

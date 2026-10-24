@@ -87,7 +87,7 @@ export default class Mpv extends EventEmitter {
   }
 
   #spawn() {
-    const { mpvPath, mpvSocket, mpvHwdec, mpvAudioDevice, ytdlPath, mpvExtraArgs } = this.config;
+    const { mpvPath, mpvSocket, mpvHwdec, mpvAudioDevice, ytdlPath, ytdlFormat, mpvExtraArgs } = this.config;
     if (process.platform !== 'win32') fs.rmSync(mpvSocket, { force: true });
 
     const scripts = fs.existsSync(SCRIPTS_DIR)
@@ -103,6 +103,7 @@ export default class Mpv extends EventEmitter {
       `--hwdec=${mpvHwdec}`,
       ...(mpvAudioDevice ? [`--audio-device=${mpvAudioDevice}`] : []),
       `--script-opts-append=ytdl_hook-ytdl_path=${ytdlPath}`,
+      `--ytdl-format=${ytdlFormat}`,
       ...scripts,
       ...mpvExtraArgs,
     ];
@@ -236,10 +237,12 @@ export default class Mpv extends EventEmitter {
     return this.command('set_property', name, value);
   }
 
-  async load(url, { start = 0, title = '' } = {}) {
-    // 'start' and 'force-media-title' are global options, so reset them on every load.
+  /** `headers`: HTTP header lines ("Name: value") for the stream requests. */
+  async load(url, { start = 0, title = '', headers = [] } = {}) {
+    // These are global options, so reset them on every load.
     await this.set('start', start > 0 ? String(start) : 'none');
     await this.set('force-media-title', title);
+    await this.set('http-header-fields', headers);
     await this.set('pause', false);
     await this.command('loadfile', url, 'replace');
   }
