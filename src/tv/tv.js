@@ -48,7 +48,7 @@ export default class Tv {
       // time-pos only matters for the progress bars.
       if (name !== 'time-pos' || this.screen() === 'paused' || this.card) this.render();
     });
-    mpv.on('file-loaded', () => this.#onFileLoaded());
+    playback.on('started', () => this.#onStarted());
     playback.on('change', () => this.render());
     playback.on('ended', ({ reason }) => {
       if (reason === 'error') this.toast("Couldn't play that link");
@@ -70,7 +70,7 @@ export default class Tv {
     const p = this.mpv.props;
     const source = this.playback.source;
     if (!source) return p['idle-active'] ? 'home' : 'playing';
-    if (p['idle-active'] || this.playback.switching) return 'loading';
+    if (p['idle-active'] || this.playback.loading) return 'loading';
     return p.pause ? 'paused' : 'playing';
   }
 
@@ -121,7 +121,7 @@ export default class Tv {
     this.settings.update(patch).catch((e) => this.log.warn('TV settings change failed:', e.message));
   }
 
-  async #onFileLoaded() {
+  async #onStarted() {
     const { mpv } = this;
     let quality = null;
     try {

@@ -1,0 +1,29 @@
+#!/bin/sh
+# yt-dlp for mpv's ytdl hook, with yt-dlp's preprocessed-player cache turned on.
+#
+# For every video, yt-dlp hands YouTube's whole player script (~4 MB) to Node
+# to solve its JS challenge. Parsing it takes ~20 s on a Pi 3; with the cache,
+# the parsed player is reused and solving takes ~1 s. yt-dlp keeps this cache
+# off because it never deletes old players, so only the newest two are kept.
+# If yt-dlp changes its internals, this quietly runs plain yt-dlp.
+exec "$(dirname "$0")/../.venv/bin/python" -c '
+import os, sys
+
+try:
+    from yt_dlp.extractor.youtube.jsc._builtin import ejs
+    if hasattr(ejs.EJSBaseJCP, "_ENABLE_PREPROCESSED_PLAYER_CACHE"):
+        ejs.EJSBaseJCP._ENABLE_PREPROCESSED_PLAYER_CACHE = True
+    # yt-dlp default cache dir (mpv passes no --cache-dir).
+    base = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
+    d = os.path.join(base, "yt-dlp", ejs.EJSBaseJCP._CACHE_SECTION)
+    players = sorted((e for e in os.scandir(d) if e.name.startswith("player")),
+                     key=lambda e: e.stat().st_mtime, reverse=True)
+    for e in players[2:]:
+        os.remove(e.path)
+except Exception:
+    pass
+
+import yt_dlp
+sys.argv[0] = "yt-dlp"
+sys.exit(yt_dlp.main())
+' "$@"

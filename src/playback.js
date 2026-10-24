@@ -11,7 +11,8 @@ import { lookup } from './metadata.js';
  * Events:
  *  'takeover' (previousOwner) - someone else started playing
  *  'ended' ({ owner, reason }) - the current item finished ('eof') or failed ('error')
- *  'change' - owner, source or metadata changed
+ *  'started' - the first frame of a new item is on screen
+ *  'change' - owner, source, metadata or loading changed
  *  'play' ({ owner, url, kind }) - a new item was requested
  */
 export default class Playback extends EventEmitter {
@@ -28,10 +29,27 @@ export default class Playback extends EventEmitter {
     // True between starting a new item and mpv picking it up; end-file events
     // from the item being replaced are ignored during that window.
     this.switching = false;
+    // True from the request until the first frame. mpv's start-file comes
+    // right after loadfile, long before yt-dlp has found the streams, so
+    // idle-active alone would show a black screen for most of the wait.
+    this.loading = false;
+    // Timestamps of the current load, logged once the first frame shows.
+    this.timing = null;
 
-    mpv.on('start-file', () => { this.switching = false; });
+    mpv.on('start-file', () => {
+      this.switching = false;
+      this.#mark('start-file');
+    });
+    mpv.on('file-loaded', () => this.#mark('file-loaded'));
+    mpv.on('playback-restart', () => {
+      if (!this.loading) return;
+      this.#mark('first frame');
+      this.#setLoading(false);
+      this.emit('started');
+    });
     mpv.on('end-file', (reason) => {
       if (this.switching || (reason !== 'eof' && reason !== 'error')) return;
+      this.#setLoading(false);
       const { owner } = this;
       this.#clear();
       this.streamlink.close();
@@ -40,7 +58,25 @@ export default class Playback extends EventEmitter {
     });
   }
 
+  #setLoading(on) {
+    if (!on && this.timing) {
+      const t0 = this.timing.request;
+      const steps = Object.entries(this.timing).filter(([k]) => k !== 'request')
+        .map(([k, t]) => `${k} +${((t - t0) / 1000).toFixed(1)}s`);
+      this.log.info(`load timing: ${steps.join(', ')}`);
+      this.timing = null;
+    }
+    if (this.loading === on) return;
+    this.loading = on;
+    this.emit('change');
+  }
+
+  #mark(step) {
+    if (this.timing && !(step in this.timing)) this.timing[step] = Date.now();
+  }
+
   #clear() {
+    this.#setLoading(false);
     this.owner = null;
     this.source = null;
     this.emit('change');
@@ -50,6 +86,8 @@ export default class Playback extends EventEmitter {
     const kind = classify(url);
     const previous = this.owner;
     this.switching = true;
+    this.timing = { request: Date.now() };
+    this.loading = true;
     this.owner = owner;
     const source = { url, kind, title: null, channel: null, thumbnail: null };
     this.source = source;
@@ -70,11 +108,14 @@ export default class Playback extends EventEmitter {
         // Opening a new stream kills the old streamlink first; the resulting
         // EOF of the old item is ignored because we're switching.
         const local = await this.streamlink.open(url, this.getTwitchQuality());
+        this.#mark('streamlink');
         await meta;
         await this.mpv.load(local, { title: source.title ?? url });
+        this.#mark('loadfile');
       } else {
         // Load first, then drop any old Twitch stream, so its EOF lands as a 'stop'.
         await this.mpv.load(url, { start });
+        this.#mark('loadfile');
         await this.streamlink.close();
       }
     } catch (e) {
@@ -106,7 +147,7 @@ export default class Playback extends EventEmitter {
       thumbnail: s?.thumbnail ?? null,
       idle: !!p['idle-active'],
       // Between asking for a video and its first frame (yt-dlp is slow on a Pi 3).
-      loading: !!s && (this.switching || !!p['idle-active'] || !!p['paused-for-cache']),
+      loading: !!s && (this.loading || !!p['paused-for-cache']),
       paused: !!p.pause,
       live: s?.kind === 'twitch',
       position: p['time-pos'] ?? 0,

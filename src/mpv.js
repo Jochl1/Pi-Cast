@@ -14,7 +14,8 @@ const SCRIPTS_DIR = path.join(ROOT, 'mpv-scripts');
  * Runs a single long-lived mpv instance (idle, fullscreen on the TV) and
  * talks to it over its JSON IPC socket. Restarts mpv if it crashes.
  *
- * Events: 'property' (name, value), 'end-file' (reason), 'start-file', 'file-loaded', 'ready',
+ * Events: 'property' (name, value), 'end-file' (reason), 'start-file', 'file-loaded',
+ * 'playback-restart' (first frame after a load or seek), 'ready',
  * 'log' (text of an mpv error message)
  * ('property' also fires for the polled 'time-pos')
  */
@@ -187,6 +188,7 @@ export default class Mpv extends EventEmitter {
         break;
       case 'start-file':
       case 'file-loaded':
+      case 'playback-restart':
         this.emit(msg.event);
         break;
       case 'log-message':
