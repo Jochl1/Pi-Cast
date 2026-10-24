@@ -1,5 +1,17 @@
 # Pi-Cast — handoff prompt for a new session
 
+> **Status (2026-10-24):** all build phases in §8 are done and pushed; nothing has run on
+> the Pi yet. Next step is hardware testing (§9). Deviations from the plan below:
+> - TV glow is drawn with blurred ASS shapes, not an `overlay-add` bitmap: mpv draws
+>   overlay-add bitmaps above all ASS overlays, so a bitmap background would cover the text.
+>   Thumbnails still use overlay-add. The optional drifting home-screen video was not built.
+> - CEC uses libcec's `cec-client` (package `cec-utils`) instead of `cec-ctl --monitor`,
+>   because it answers the TV's power/menu queries that many TVs need before sending keys.
+> - streamlink 6+ always filters Twitch ads; `--twitch-disable-ads` is gone.
+> - The receiver's node-persist store is replaced (`src/receiverStore.js`): it writes
+>   before initialising and drops data.
+> - `scripts/preview-tv.js` renders the TV screens to PNG with any libass-enabled ffmpeg.
+
 > Paste this file (or point the new session at it) to continue the build.
 > Everything below was decided with the user in the previous session.
 
