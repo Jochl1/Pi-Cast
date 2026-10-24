@@ -122,17 +122,3 @@ export function arcBand(cx, cy, radius, thickness, from, to, opts = {}) {
   }
   return polygon([...outer, ...inner.reverse()], opts);
 }
-
-/**
- * Soft radial glow: stacked blurred circles approximating a linear falloff
- * from `peak` opacity at the centre to 0 at `radius` (like CSS radial-gradient).
- */
-export function glow(cx, cy, radius, color, peak, rings = 8) {
-  const coverage = (k) => (k > rings ? 0 : peak * (1 - (k - 0.5) / rings));
-  const events = [];
-  for (let k = rings; k >= 1; k--) {
-    const a = 1 - (1 - coverage(k)) / (1 - coverage(k + 1));
-    events.push(circle(cx, cy, (radius * k) / rings, { color, opacity: a, blur: (radius / rings) * 0.9 }));
-  }
-  return events;
-}

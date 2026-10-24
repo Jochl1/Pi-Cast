@@ -1,11 +1,16 @@
 import { STYLES } from '../shared/theme.js';
 import {
-  text, span, rect, circle, arcBand, glow, escape, fit, textWidth,
+  text, span, rect, circle, arcBand, escape, fit, textWidth,
 } from './ass.js';
 
 /**
  * Pure layout functions: state in, ASS events out. Coordinates are 1920x1080
  * (the design mock-ups were 640x360, so their sizes are multiplied by 3).
+ *
+ * mpv packs all overlays into one texture, which the Pi 3's GPU caps at
+ * 2048x2048; if they don't fit, nothing is drawn. So no full-screen shapes
+ * behind the home screen (its color is mpv's background-color, see Tv) and
+ * no big blurred glows. Run scripts/check-osd.js on the Pi after changes.
  */
 
 export const W = 1920;
@@ -33,17 +38,6 @@ function clockParts(now, clock24) {
   const mm = String(now.getMinutes()).padStart(2, '0');
   if (clock24) return { time: `${String(h).padStart(2, '0')}:${mm}`, suffix: '', date };
   return { time: `${h % 12 || 12}:${mm}`, suffix: h < 12 ? 'AM' : 'PM', date };
-}
-
-/** Background: solid style color, plus the two accent glows for Aurora. */
-export function background(t) {
-  const events = [rect(0, 0, W, H, { color: t.bg })];
-  if (t.glow) {
-    // Blob A: top-left, ~45% alpha. Blob B: bottom-right, ~30% alpha.
-    events.push(...glow(450, 270, 475, t.accent, 0.45));
-    events.push(...glow(1590, 990, 435, t.accent, 0.30));
-  }
-  return events;
 }
 
 function clock(t, now, clock24, opacity = 1) {

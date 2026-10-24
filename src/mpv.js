@@ -14,7 +14,8 @@ const SCRIPTS_DIR = path.join(ROOT, 'mpv-scripts');
  * Runs a single long-lived mpv instance (idle, fullscreen on the TV) and
  * talks to it over its JSON IPC socket. Restarts mpv if it crashes.
  *
- * Events: 'property' (name, value), 'end-file' (reason), 'start-file', 'file-loaded', 'ready'
+ * Events: 'property' (name, value), 'end-file' (reason), 'start-file', 'file-loaded', 'ready',
+ * 'log' (text of an mpv error message)
  * ('property' also fires for the polled 'time-pos')
  */
 export default class Mpv extends EventEmitter {
@@ -37,6 +38,7 @@ export default class Mpv extends EventEmitter {
     this.shuttingDown = false;
     this.restartDelay = 2000;
     this.restartTimer = null;
+    this.lastLog = null;
   }
 
   /** Starts mpv. Never throws: failures are logged and retried with backoff. */
@@ -158,6 +160,9 @@ export default class Mpv extends EventEmitter {
     });
 
     await Promise.all(OBSERVED.map((name, i) => this.command('observe_property', i + 1, name)));
+    // mpv reports some failures only in its log, e.g. overlays that don't fit
+    // the GPU's texture size (they're then silently not drawn).
+    await this.command('request_log_messages', 'error');
     this.log.info('mpv ready');
     this.emit('ready');
   }
@@ -184,7 +189,21 @@ export default class Mpv extends EventEmitter {
       case 'file-loaded':
         this.emit(msg.event);
         break;
+      case 'log-message':
+        this.#onLog(`${msg.prefix}: ${msg.text.trim()}`);
+        break;
     }
+  }
+
+  #onLog(text) {
+    // Harmless: mpv runs as a service, without a terminal.
+    if (text.includes("Can't open TTY for VT control")) return;
+    // Some errors repeat on every frame; log each one at most once a minute.
+    const now = Date.now();
+    if (this.lastLog?.text === text && now - this.lastLog.at < 60000) return;
+    this.lastLog = { text, at: now };
+    this.log.warn('[mpv]', text);
+    this.emit('log', text);
   }
 
   /** Send a command. Pass positional args, or a single object for named-argument commands. */

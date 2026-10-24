@@ -6,7 +6,6 @@ import * as screens from './screens.js';
 // osd-overlay ids; higher z draws on top. The thumbnail is an overlay-add
 // bitmap, which mpv always draws above all of these.
 const LAYERS = {
-  bg: { id: 1, z: 0 },
   home: { id: 2, z: 1 },
   popup: { id: 3, z: 5 },
   pause: { id: 4, z: 6 },
@@ -165,6 +164,7 @@ export default class Tv {
   }
 
   async #draw() {
+    if (!this.mpv.socket) return; // redrawn on 'ready'
     const now = Date.now();
     const s = this.settings.get();
     const t = themeFor(s);
@@ -180,9 +180,12 @@ export default class Tv {
     if (this.card && (this.card.until <= now || screen === 'paused' || screen === 'home')) this.card = null;
     if (this.message && this.message.until <= now) this.message = null;
 
-    const layers = { bg: null, home: null, popup: null, pause: null, panel: null, toast: null };
+    // The home screen's backdrop is mpv's own background color: a full-screen
+    // overlay would take half of the Pi 3's overlay texture (see screens.js).
+    await this.#setBackground(onHome ? t.bg : '#000000');
+
+    const layers = { home: null, popup: null, pause: null, panel: null, toast: null };
     if (onHome) {
-      layers.bg = screens.background(t);
       const sender = status.owner === 'cast' ? this.cast.senders()[0] : null;
       layers.home = screens.home(t, {
         now: new Date(now),
@@ -242,8 +245,19 @@ export default class Tv {
       if (data === null) await this.mpv.clearOverlay({ id });
       else await this.mpv.showOverlay(data, { id, z });
       this.sent[name] = data;
-    } catch {
+    } catch (e) {
       delete this.sent[name]; // retried on the next draw
+      this.log.warn(`TV overlay "${name}" failed:`, e.message);
+    }
+  }
+
+  async #setBackground(color) {
+    if (this.sent.background === color) return;
+    try {
+      await this.mpv.set('background-color', color);
+      this.sent.background = color;
+    } catch (e) {
+      this.log.warn('TV background failed:', e.message);
     }
   }
 
