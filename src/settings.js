@@ -1,10 +1,15 @@
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import path from 'node:path';
-import { ACCENTS, TWITCH_QUALITIES, isHex } from './shared/theme.js';
+import { ACCENTS, KEY_COLORS, TWITCH_QUALITIES, isHex } from './shared/theme.js';
 import { LANGUAGES } from './shared/i18n.js';
 
 const bool = (v) => typeof v === 'boolean';
+const isObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
+/** { red, green, yellow, blue }: each null or { name, url } with an http(s) link. */
+const shortcutsOk = (v) => isObject(v) && Object.entries(v).every(([color, s]) => color in KEY_COLORS && (s === null || (
+  isObject(s) && typeof s.name === 'string' && s.name.trim().length > 0 && s.name.length <= 30
+  && typeof s.url === 'string' && /^https?:\/\/\S+$/i.test(s.url) && s.url.length <= 500)));
 
 // Each setting: default value and a validator for incoming values.
 const SCHEMA = {
@@ -15,6 +20,16 @@ const SCHEMA = {
   sponsorBlock: { def: true, ok: bool },
   clock24: { def: true, ok: bool },
   language: { def: 'en', ok: (v) => v in LANGUAGES },
+  // Favourites on the remote's colour keys.
+  shortcuts: {
+    def: {
+      red: { name: 'Trymacs', url: 'https://www.twitch.tv/trymacs' },
+      green: { name: 'BigSpin', url: 'https://www.twitch.tv/bigspincr' },
+      yellow: null,
+      blue: null,
+    },
+    ok: shortcutsOk,
+  },
   deviceName: { def: 'pi-cast', ok: (v) => typeof v === 'string' && v.trim().length > 0 && v.length <= 40 },
   twitchQuality: { def: '720p60', ok: (v) => TWITCH_QUALITIES.includes(v) },
   cecEnabled: { def: true, ok: bool },

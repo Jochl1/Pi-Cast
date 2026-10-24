@@ -1,4 +1,4 @@
-import { ACCENTS, TWITCH_QUALITIES, themeFor } from '/shared/theme.js';
+import { ACCENTS, KEY_COLORS, TWITCH_QUALITIES, themeFor } from '/shared/theme.js';
 import { LANGUAGES, translator } from '/shared/i18n.js';
 
 const $ = (id) => document.getElementById(id);
@@ -287,9 +287,61 @@ function buildSettings() {
 
   $('twitch-quality').addEventListener('change', (e) => change({ twitchQuality: e.target.value }));
 
+  $('shortcuts').replaceChildren(...Object.entries(KEY_COLORS).map(([color, hex]) => {
+    const row = document.createElement('div');
+    row.className = 'shortcut';
+    row.dataset.color = color;
+    const dot = document.createElement('span');
+    dot.className = 'key-dot';
+    dot.style.background = hex;
+    const fields = document.createElement('div');
+    fields.className = 'shortcut-fields';
+    const name = document.createElement('input');
+    name.className = 'sc-name';
+    name.type = 'text';
+    name.maxLength = 30;
+    name.dataset.i18nPlaceholder = 'shortcutName';
+    const url = document.createElement('input');
+    url.className = 'sc-url';
+    url.type = 'url';
+    url.inputMode = 'url';
+    url.autocapitalize = 'off';
+    url.spellcheck = false;
+    url.dataset.i18nPlaceholder = 'shortcutLink';
+    for (const input of [name, url]) {
+      input.autocomplete = 'off';
+      input.enterKeyHint = 'done';
+      input.addEventListener('change', () => saveShortcut(color, name.value, url.value));
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+    }
+    fields.append(name, url);
+    row.append(dot, fields);
+    return row;
+  }));
+
   const language = $('language');
   language.replaceChildren(...Object.entries(LANGUAGES).map(([id, l]) => new Option(l.label, id)));
   language.addEventListener('change', () => change({ language: language.value }));
+}
+
+/** A readable default name for a link: the Twitch channel, else the site. */
+function nameFor(link) {
+  try {
+    const u = new URL(link);
+    const channel = /(^|\.)twitch\.tv$/.test(u.hostname) && u.pathname.split('/')[1];
+    if (channel) return channel[0].toUpperCase() + channel.slice(1);
+    if (/(^|\.)(youtube\.com|youtu\.be)$/.test(u.hostname)) return 'YouTube';
+    return u.hostname.replace(/^www\./, '');
+  } catch {
+    return '';
+  }
+}
+
+function saveShortcut(color, name, link) {
+  link = link.trim();
+  if (link && !/^https?:\/\//i.test(link)) link = `https://${link}`;
+  const shortcut = link ? { name: (name.trim() || nameFor(link)).slice(0, 30), url: link } : null;
+  change({ shortcuts: { ...state.settings.shortcuts, [color]: shortcut } });
 }
 
 /** Puts every fixed text in the current language; the rest is rendered with tr(). */
@@ -320,6 +372,12 @@ function renderSettings() {
   if (document.activeElement !== $('device-name')) $('device-name').value = s.deviceName;
   $('twitch-quality').value = s.twitchQuality;
   $('twitch-quality-value').textContent = s.twitchQuality;
+  for (const row of $('shortcuts').children) {
+    const sc = s.shortcuts?.[row.dataset.color];
+    const [name, url] = row.querySelectorAll('input');
+    if (document.activeElement !== name) name.value = sc?.name ?? '';
+    if (document.activeElement !== url) url.value = sc?.url ?? '';
+  }
   $('language').value = s.language;
   $('language-value').textContent = LANGUAGES[s.language]?.label ?? s.language;
 }

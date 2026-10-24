@@ -16,7 +16,8 @@ import ReceiverStore from './receiverStore.js';
 import Tv from './tv/tv.js';
 import Cec from './cec.js';
 import BootSplash from './boot.js';
-import { themeFor } from './shared/theme.js';
+import { KEY_COLORS, themeFor } from './shared/theme.js';
+import { translator } from './shared/i18n.js';
 
 const config = loadConfig();
 const log = createLogger(config.logLevel);
@@ -134,7 +135,27 @@ const REMOTE_ACTIONS = {
   backward: () => controls.seekBy(-30),
   forward: () => controls.seekBy(30),
 };
+/** A colour key plays its favourite, on any screen, like "Play a link" in the web app. */
+function playShortcut(color) {
+  const tr = translator(settings.get().language);
+  const shortcut = settings.get().shortcuts[color];
+  const keyName = tr(`key${color[0].toUpperCase()}${color.slice(1)}`);
+  if (!shortcut) {
+    tv.toast(tr('shortcutUnset', { key: keyName }), { dot: KEY_COLORS[color] });
+    return;
+  }
+  tv.toast(shortcut.name, { dot: KEY_COLORS[color] });
+  playback.play(shortcut.url, { owner: 'web' }).catch((e) => {
+    log.warn(`${color} key: ${e.message}`);
+    tv.toast(tr('couldntPlay'));
+  });
+}
+
 cec.on('key', (key) => {
+  if (key in KEY_COLORS) {
+    playShortcut(key);
+    return;
+  }
   // The settings panel (and OK on the home screen) come first.
   if (tv.key(key) || !playback.source) return;
   Promise.resolve(REMOTE_ACTIONS[key]?.()).catch((e) => log.debug(`remote key ${key} failed:`, e.message));

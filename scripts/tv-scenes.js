@@ -55,6 +55,7 @@ export const scenes = {
       screens.settingsPanel(t, { settings: base, focus: 2, swatches })],
   },
   toast: { settings: base, video: true, layers: (t) => [screens.toast(t, toastText)] },
+  'key-toast': { settings: base, video: true, layers: (t) => [screens.toast(t, 'Trymacs', '#FF5D5D')] },
   // German: the longest texts.
   'home-de': { settings: de, layers: (t) => [screens.home(t, homeState)] },
   'loading-de': {

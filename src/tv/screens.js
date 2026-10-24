@@ -333,15 +333,19 @@ export function settingsPanel(t, { settings, focus, swatches }) {
   return events;
 }
 
-/** Short message at the bottom centre, e.g. playback errors. */
-export function toast(t, message) {
+/** Short message at the bottom centre, e.g. playback errors; `dot` = color of a leading dot. */
+export function toast(t, message, dot = null) {
   const label = escape(fit(message, 39, 1400));
-  const w = textWidth(label, 39, 0.56) + 108;
+  const lead = dot ? 24 + 24 : 0;
+  const w = textWidth(label, 39, 0.56) + 108 + lead;
   const h = 114;
-  return [
-    rect(W / 2 - w / 2, H - 120 - h, w, h, { color: t.glass, radius: Math.min(t.pill * 3, h / 2), border: 3, borderColor: t.line }),
-    text(label, { x: W / 2, y: H - 120 - h / 2, an: 5, px: 39, color: t.text }),
+  const x = W / 2 - w / 2;
+  const events = [
+    rect(x, H - 120 - h, w, h, { color: t.glass, radius: Math.min(t.pill * 3, h / 2), border: 3, borderColor: t.line }),
+    text(label, { x: W / 2 + lead / 2, y: H - 120 - h / 2, an: 5, px: 39, color: t.text }),
   ];
+  if (dot) events.push(circle(x + 54 + 12, H - 120 - h / 2, 12, { color: dot }));
+  return events;
 }
 
 export { wordmark };

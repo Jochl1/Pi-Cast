@@ -198,6 +198,17 @@ input[type="range"] { flex-grow: 1; accent-color: var(--accent); height: 28px; }
 .row-item + .row-item { border-top: 1px solid var(--line); }
 .row-item .value { color: var(--muted); }
 .row-item input[type="color"] { width: 44px; height: 32px; border: 0; padding: 0; background: transparent; }
+
+.shortcut { display: flex; align-items: center; gap: 12px; padding: 10px 14px; }
+.shortcut + .shortcut { border-top: 1px solid var(--line); }
+.key-dot { width: 14px; height: 14px; flex-shrink: 0; border-radius: 999px; }
+.shortcut-fields { flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.shortcut-fields input {
+  width: 100%; border: 0; padding: 4px 0; background: transparent; outline: none;
+  font-size: 16px; /* 16px stops iOS zooming in on focus */
+}
+.shortcut-fields .sc-url { font-size: 13px; color: var(--muted); }
+.shortcut-fields input::placeholder { color: var(--muted); opacity: 0.6; }
 .value-input {
   min-width: 0; flex: 0 1 55%; height: 44px; border: 0; background: transparent;
   color: var(--muted); text-align: right; font-size: 16px;

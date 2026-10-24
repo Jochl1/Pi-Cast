@@ -118,8 +118,9 @@ export default class Tv {
     }
   }
 
-  toast(text) {
-    this.message = { text, until: Date.now() + TOAST_MS };
+  /** Shows a short message; `dot` = color of a dot in front of it. */
+  toast(text, { dot = null } = {}) {
+    this.message = { text, dot, until: Date.now() + TOAST_MS };
     this.render();
   }
 
@@ -269,7 +270,7 @@ export default class Tv {
         })),
       });
     }
-    if (this.message) layers.toast = screens.toast(t, this.message.text);
+    if (this.message) layers.toast = screens.toast(t, this.message.text, this.message.dot);
 
     for (const [name, events] of Object.entries(layers)) {
       await this.#send(name, events ? events.join('\n') : null);

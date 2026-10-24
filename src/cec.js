@@ -8,9 +8,12 @@ const UI_CODES = {
   0x44: 'play', 0x45: 'stop', 0x46: 'pause', 0x48: 'rewind', 0x49: 'fastforward',
   0x4b: 'forward', 0x4c: 'backward',
   0x60: 'play', 0x61: 'playpause', 0x64: 'stop',
+  // F1-F4 are the colour keys. Number keys (0x20-0x29) would be nicer for
+  // shortcuts, but the DYON TV doesn't forward them.
+  0x71: 'blue', 0x72: 'red', 0x73: 'green', 0x74: 'yellow',
 };
 // The TV repeats a code while a key is held; toggles must not flip back and forth.
-const NO_REPEAT = new Set(['ok', 'play', 'pause', 'playpause', 'stop', 'back']);
+const NO_REPEAT = new Set(['ok', 'play', 'pause', 'playpause', 'stop', 'back', 'red', 'green', 'yellow', 'blue']);
 const REPEAT_GAP_MS = 350;
 
 /**

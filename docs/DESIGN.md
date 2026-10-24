@@ -54,8 +54,8 @@ There are 10 presets plus a custom colour: Violet `#A898FF` (default), Sky `#6FA
 4. **Now-playing pop-ups** that fade after about 5 s: a "<sender> connected" pill at the top right; a card at the bottom left with the thumbnail, "NOW PLAYING" in the accent, the title, and the source and quality; and a thin accent progress line.
 5. **Paused:** dimmed video, a pause icon in an accent ring, and at the bottom the title, channel and source, an accent progress bar, and the elapsed and total times in mono.
 6. **TV settings panel:** a glass panel on the right over the dimmed home screen. Rows: accent (a swatch row), language, animations, skip sponsors, clock, switch TV input. Footer: "◀ ▶ change · OK select · Back close". OK on the home screen opens it; the arrows and Back navigate it.
-7. **Toasts** for short messages, such as "Couldn't play that link".
-8. **iPhone web app:** a header with the wordmark and a "● <TV name>" pill; a now-playing card (thumbnail, state, title and channel, progress, back 10 s / play-pause / forward 10 s, volume); a "Play a link" field; and a Recent list. Settings: the accent grid (5×2) and a custom colour; animations; device name, language, Twitch quality, SponsorBlock, 24-hour clock; and the CEC toggles ("Control with TV remote", "Switch TV input on cast").
+7. **Toasts** for short messages, such as "Couldn't play that link", or "● Trymacs" (with the key's colour) when a colour key starts a favourite.
+8. **iPhone web app:** a header with the wordmark and a "● <TV name>" pill; a now-playing card (thumbnail, state, title and channel, progress, back 10 s / play-pause / forward 10 s, volume); a "Play a link" field; and a Recent list. Settings: the accent grid (5×2) and a custom colour; animations; device name, language, Twitch quality, SponsorBlock, 24-hour clock; colour-key favourites (name and link per colour); and the CEC toggles ("Control with TV remote", "Switch TV input on cast").
 
 ## 3. Architecture
 
@@ -154,6 +154,8 @@ streamlink with `--player-external-http` on `127.0.0.1`; Pi-Cast waits for its U
 - Keys are parsed from its traffic log (`>> 04:44:xx`, USER_CONTROL_PRESSED), and held-key repeats are suppressed for toggles.
 - "Switch TV input on cast" sends image-view-on and active-source when playback starts. If the TV doesn't respond, Pi-Cast logs it and carries on.
 - Arrow-key passthrough varies by TV, so every TV setting is also in the web app.
+- **Colour keys** (F1–F4: `0x71` blue, `0x72` red, `0x73` green, `0x74` yellow on the DYON) play the favourite in the `shortcuts` setting, on any screen, through `Playback.play` with owner `'web'` (so a cast session gets the usual takeover). An empty key shows a toast.
+- **Number keys aren't forwarded by the DYON TV**, tested both as a playback device (`-t p`) and as a recorder (`-t r`) with Pi-Cast as the active source. Only OK came through. That's why favourites are on the colour keys and not on digit codes.
 
 ### Web app
 
