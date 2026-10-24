@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pi-Cast design draft</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@400;500;600;700&amp;family=Sora:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#9fdcf0}a:hover{color:#ffffff}
+button{font:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid #ffffff;outline-offset:2px}
+@keyframes pcDriftA{0%{transform:translate(-50px,-20px) scale(1)}50%{transform:translate(60px,30px) scale(1.08)}100%{transform:translate(10px,60px) scale(0.94)}}
+@keyframes pcDriftB{0%{transform:translate(40px,30px) scale(1)}50%{transform:translate(-60px,-20px) scale(1.1)}100%{transform:translate(-10px,-50px) scale(0.96)}}
+.pc-blob-a{animation:pcDriftA 14s ease-in-out infinite alternate}
+.pc-blob-b{animation:pcDriftB 18s ease-in-out infinite alternate}
+@media (prefers-reduced-motion: reduce){.pc-blob-a,.pc-blob-b{animation:none}}
+</style>
+</helmet>
+<div style="width: 1440px; height: 3320px; box-sizing: border-box; padding: 48px 40px; display: flex; flex-direction: column; gap: 40px; background: {{t.page}}; color: {{t.text}}; font-family: {{font}};">
+
+  <header style="display: flex; justify-content: space-between; align-items: flex-end; gap: 24px;">
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <p style="margin: 0; font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: {{t.muted}};">Design draft · v2</p>
+      <h1 style="margin: 0; font-size: 44px; font-weight: 600; letter-spacing: -0.02em;">Pi-Cast look &amp; feel</h1>
+      <p style="margin: 0; font-size: 16px; color: {{t.muted}};">Pick a style, accent, logo and font. Every screen below updates live.</p>
+    </div>
+    <p style="margin: 0; font-size: 14px; color: {{t.muted}};">Current: {{summary}}</p>
+  </header>
+
+  <section aria-label="Options" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; padding: 24px; border: 1px solid {{t.line}}; border-radius: {{t.radius}}px; background: {{t.panel}};">
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+      <h2 style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: {{t.muted}};">A · Style</h2>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <sc-for list="{{styleOpts}}" as="o" hint-placeholder-count="3">
+          <button type="button" onClick="{{o.pick}}" aria-pressed="{{o.selected}}" style="min-height: 44px; padding: 0 16px; border: 1px solid; border-radius: 999px; font-size: 15px; font-weight: 500; {{o.style}}">{{o.label}}</button>
+        </sc-for>
+      </div>
+      <p style="margin: 0; font-size: 13px; line-height: 1.45; color: {{t.muted}};">{{styleNote}}</p>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+      <h2 style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: {{t.muted}};">B · Accent</h2>
+      <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+        <sc-for list="{{accentOpts}}" as="o" hint-placeholder-count="4">
+          <button type="button" onClick="{{o.pick}}" aria-label="{{o.label}}" aria-pressed="{{o.selected}}" style="width: 44px; height: 44px; border-radius: 999px; border: 0; background: {{o.hex}}; {{o.ring}}"></button>
+        </sc-for>
+      </div>
+      <p style="margin: 0; font-size: 13px; color: {{t.muted}};">{{accentName}} · {{accent}}</p>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+      <h2 style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: {{t.muted}};">C · Logo</h2>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <sc-for list="{{markOpts}}" as="o" hint-placeholder-count="3">
+          <button type="button" onClick="{{o.pick}}" aria-pressed="{{o.selected}}" style="min-height: 44px; padding: 0 16px; border: 1px solid; border-radius: 999px; font-size: 15px; font-weight: 500; {{o.style}}">{{o.label}}</button>
+        </sc-for>
+      </div>
+      <p style="margin: 0; font-size: 13px; line-height: 1.45; color: {{t.muted}};">{{markNote}}</p>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+      <h2 style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: {{t.muted}};">D · Font</h2>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <sc-for list="{{fontOpts}}" as="o" hint-placeholder-count="3">
+          <button type="button" onClick="{{o.pick}}" aria-pressed="{{o.selected}}" style="min-height: 44px; padding: 0 16px; border: 1px solid; border-radius: 999px; font-size: 15px; font-weight: 500; {{o.style}} font-family: {{o.family}};">{{o.label}}</button>
+        </sc-for>
+      </div>
+      <p style="margin: 0; font-size: 13px; line-height: 1.45; color: {{t.muted}};">{{fontNote}}</p>
+    </div>
+  </section>
+
+  <section aria-label="TV screens" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px 48px;">
+
+    <figure style="margin: 0; display: flex; flex-direction: column; gap: 12px;">
+      <figcaption style="font-size: 14px; color: {{t.muted}};"><strong style="color: {{t.text}}; font-weight: 600;">1 · Boot</strong> — glow drifts slowly while the Pi starts (Aurora)</figcaption>
+      <div style="width: 656px; height: 376px; box-sizing: border-box; padding: 8px; background: #000000; border-radius: 12px;">
+        <div style="width: 640px; height: 360px; position: relative; overflow: hidden; background: {{t.tvBase}}; color: {{t.text}};">
+          <sc-if value="{{isAurora}}" hint-placeholder-val="{{true}}">
+            <div class="{{blobA}}" style="position: absolute; left: -90px; top: -150px; width: 480px; height: 480px; border-radius: 999px; {{blobAStyle}}"></div>
+            <div class="{{blobB}}" style="position: absolute; right: -110px; bottom: -190px; width: 440px; height: 440px; border-radius: 999px; {{blobBStyle}}"></div>
+          </sc-if>
+          <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;">
+          <sc-if value="{{showBeam}}" hint-placeholder-val="{{true}}"><svg width="76" height="76" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M7 8.6v14.8a1.2 1.2 0 0 0 1.8 1l11.8-7.4a1.2 1.2 0 0 0 0-2L8.8 7.6A1.2 1.2 0 0 0 7 8.6z" fill="{{accent}}"></path><path d="M23.5 11a7.5 7.5 0 0 1 0 10" stroke="{{accent}}" stroke-width="2.4" stroke-linecap="round"></path><path d="M27 7.5a12.5 12.5 0 0 1 0 17" stroke="{{accent}}" stroke-width="2.4" stroke-linecap="round" opacity="0.55"></path></svg></sc-if>
+          <sc-if value="{{showTile}}" hint-placeholder-val="{{false}}"><svg width="76" height="76" viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="2" width="28" height="28" rx="{{tileRx}}" fill="{{accent}}"></rect><path d="M13 10.8v10.4a.8.8 0 0 0 1.2.7l8.3-5.2a.8.8 0 0 0 0-1.4l-8.3-5.2a.8.8 0 0 0-1.2.7z" fill="#0A0C10"></path></svg></sc-if>
+          <div style="font-size: {{bootWordSize}}px; font-weight: 600; letter-spacing: -0.02em;">
+            <sc-if value="{{isWordmark}}" hint-placeholder-val="{{false}}"><span>pi<span style="color: {{accent}};">·</span>cast</span></sc-if>
+            <sc-if value="{{hasMark}}" hint-placeholder-val="{{true}}"><span>Pi-Cast</span></sc-if>
+          </div>
+          <div style="display: flex; gap: 8px;" aria-hidden="true">
+            <span style="width: 6px; height: 6px; border-radius: 999px; background: {{t.dim}};"></span>
+            <span style="width: 6px; height: 6px; border-radius: 999px; background: {{accent}};"></span>
+            <span style="width: 6px; height: 6px; border-radius: 999px; background: {{t.dim}};"></span>
+          </div>
+          </div>
+          <p style="position: absolute; bottom: 20px; left: 0; right: 0; text-align: center; margin: 0; font-size: 11px; letter-spacing: 0.08em; color: {{t.muted}}; text-transform: uppercase;">Starting up</p>
+        </div>
+      </div>
+    </figure>
+
+    <figure style="margin: 0; display: flex; flex-direction: column; gap: 12px;">
+      <figcaption style="font-size: 14px; color: {{t.muted}};"><strong style="color: {{t.text}}; font-weight: 600;">2 · Home</strong> — idle, waiting for a cast</figcaption>
+      <div style="width: 656px; height: 376px; box-sizing: border-box; padding: 8px; background: #000000; border-radius: 12px;">
+        <div style="width: 640px; height: 360px; box-sizing: border-box; padding: 28px 32px; overflow: hidden; background: {{t.tv}}; color: {{t.text}}; display: flex; flex-direction: column;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div style="display: flex; flex-direction: column; gap: 2px;">
+              <span style="font-size: 52px; font-weight: 600; letter-spacing: -0.03em; line-height: 1;">21:34</span>
+              <span style="font-size: 13px; color: {{t.muted}};">Saturday, 24 October</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: {{t.muted}};">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M2 8.8a15 15 0 0 1 20 0"></path><path d="M5 12.5a10 10 0 0 1 14 0"></path><path d="M8.5 16.1a5 5 0 0 1 7 0"></path><circle cx="12" cy="19.5" r="0.8" fill="currentColor"></circle></svg>
+              <span>Wi-Fi · Home</span>
+            </div>
+          </div>
+          <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;">
+            <sc-if value="{{showBeam}}" hint-placeholder-val="{{true}}"><svg width="40" height="40" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M7 8.6v14.8a1.2 1.2 0 0 0 1.8 1l11.8-7.4a1.2 1.2 0 0 0 0-2L8.8 7.6A1.2 1.2 0 0 0 7 8.6z" fill="{{accent}}"></path><path d="M23.5 11a7.5 7.5 0 0 1 0 10" stroke="{{accent}}" stroke-width="2.4" stroke-linecap="round"></path><path d="M27 7.5a12.5 12.5 0 0 1 0 17" stroke="{{accent}}" stroke-width="2.4" stroke-linecap="round" opacity="0.55"></path></svg></sc-if>
+            <sc-if value="{{showTile}}" hint-placeholder-val="{{false}}"><svg width="40" height="40" viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="2" width="28" height="28" rx="{{tileRx}}" fill="{{accent}}"></rect><path d="M13 10.8v10.4a.8.8 0 0 0 1.2.7l8.3-5.2a.8.8 0 0 0 0-1.4l-8.3-5.2a.8.8 0 0 0-1.2.7z" fill="#0A0C10"></path></svg></sc-if>
+            <span style="font-size: 26px; font-weight: 600; letter-spacing: -0.01em;">Ready to cast</span>
+            <span style="font-size: 13px; color: {{t.muted}};">Open YouTube on your phone and tap Cast → Pi-Cast</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: flex-end; padding-top: 14px; border-top: 1px solid {{t.line}};">
+            <div style="display: flex; gap: 32px;">
+              <div style="display: flex; flex-direction: column; gap: 4px;">
+                <span style="font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: {{t.muted}};">TV code</span>
+                <span style="font-size: 15px; font-family: 'JetBrains Mono', monospace;">[TV CODE]</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 4px;">
+                <span style="font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: {{t.muted}};">Remote</span>
+                <span style="font-size: 15px; font-family: 'JetBrains Mono', monospace;">picast.local:8080</span>
+              </div>
+            </div>
+            <span style="font-size: 13px; font-weight: 600; color: {{t.muted}};">
+              <sc-if value="{{isWordmark}}" hint-placeholder-val="{{false}}"><span>pi<span style="color: {{accent}};">·</span>cast</span></sc-if>
+              <sc-if value="{{hasMark}}" hint-placeholder-val="{{true}}"><span>Pi-Cast</span></sc-if>
+            </span>
+          </div>
+        </div>
+      </div>
+    </figure>
+
+    <figure style="margin: 0; display: flex; flex-direction: column; gap: 12px;">
+      <figcaption style="font-size: 14px; color: {{t.muted}};"><strong style="color: {{t.text}}; font-weight: 600;">3 · Now playing</strong> — pop-ups fade out after ~5 s</figcaption>
+      <div style="width: 656px; height: 376px; box-sizing: border-box; padding: 8px; background: #000000; border-radius: 12px;">
+        <div style="width: 640px; height: 360px; position: relative; overflow: hidden; background: #2A3140; color: #F2F4F7;">
+          <span style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: #8C96A8;">[ video ]</span>
+          <div style="position: absolute; top: 18px; right: 18px; display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: {{t.pill}}px; background: {{t.glass}}; font-size: 12px; font-weight: 500;">
+            <span style="width: 8px; height: 8px; border-radius: 999px; background: {{accent}};"></span>
+            <span>iPhone connected</span>
+          </div>
+          <div style="position: absolute; left: 18px; bottom: 22px; display: flex; gap: 14px; align-items: center; padding: 12px 18px 12px 12px; border-radius: {{t.radius}}px; background: {{t.glass}}; max-width: 420px;">
+            <div style="width: 96px; height: 54px; flex-shrink: 0; border-radius: {{t.small}}px; background: #3A4254;"></div>
+            <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+              <span style="font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: {{accent}};">Now playing</span>
+              <span style="font-size: 15px; font-weight: 600;">[Video title]</span>
+              <span style="font-size: 11px; color: #B4BCC8;">YouTube · Ad-free · 1080p</span>
+            </div>
+          </div>
+          <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgba(255,255,255,0.15);">
+            <div style="width: 4%; height: 3px; background: {{accent}};"></div>
+          </div>
+        </div>
+      </div>
+    </figure>
+
+    <figure style="margin: 0; display: flex; flex-direction: column; gap: 12px;">
+      <figcaption style="font-size: 14px; color: {{t.muted}};"><strong style="color: {{t.text}}; font-weight: 600;">4 · Paused</strong> — from the TV remote or your phone</figcaption>
+      <div style="width: 656px; height: 376px; box-sizing: border-box; padding: 8px; background: #000000; border-radius: 12px;">
+        <div style="width: 640px; height: 360px; position: relative; overflow: hidden; background: #2A3140; color: #F2F4F7;">
+          <div style="position: absolute; inset: 0; background: rgba(6,8,12,0.62);"></div>
+          <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;">
+            <div style="width: 68px; height: 68px; border-radius: 999px; border: 2px solid {{accent}}; display: flex; align-items: center; justify-content: center; gap: 8px;">
+              <span style="width: 6px; height: 24px; border-radius: 2px; background: {{accent}};"></span>
+              <span style="width: 6px; height: 24px; border-radius: 2px; background: {{accent}};"></span>
+            </div>
+          </div>
+          <div style="position: absolute; left: 32px; right: 32px; bottom: 26px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; flex-direction: column; gap: 2px;">
+              <span style="font-size: 20px; font-weight: 600;">[Video title]</span>
+              <span style="font-size: 12px; color: #B4BCC8;">[Channel name] · YouTube</span>
+            </div>
+            <div style="height: 4px; border-radius: 999px; background: rgba(255,255,255,0.2);">
+              <div style="width: 38%; height: 4px; border-radius: 999px; background: {{accent}};"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 11px; color: #B4BCC8; font-family: 'JetBrains Mono', monospace;">
+              <span>12:04</span>
+              <span>31:47</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </figure>
+  </section>
+
+  <section aria-label="iPhone remote" style="display: flex; gap: 56px; align-items: flex-start;">
+    <figure style="margin: 0; display: flex; flex-direction: column; gap: 12px;">
+      <figcaption style="font-size: 14px; color: {{t.muted}};"><strong style="color: {{t.text}}; font-weight: 600;">5 · iPhone remote</strong> — Home Screen web app, served by the Pi (try the play button)</figcaption>
+      <div style="width: 410px; height: 864px; box-sizing: border-box; padding: 10px; background: #000000; border-radius: 54px;">
+        <div style="width: 390px; height: 844px; box-sizing: border-box; padding: 56px 20px 28px; border-radius: 44px; overflow: hidden; background: {{t.phone}}; color: {{t.text}}; display: flex; flex-direction: column; gap: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 600; letter-spacing: -0.01em;">
+              <sc-if value="{{showBeam}}" hint-placeholder-val="{{true}}"><svg width="28" height="28" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M7 8.6v14.8a1.2 1.2 0 0 0 1.8 1l11.8-7.4a1.2 1.2 0 0 0 0-2L8.8 7.6A1.2 1.2 0 0 0 7 8.6z" fill="{{accent}}"></path><path d="M23.5 11a7.5 7.5 0 0 1 0 10" stroke="{{accent}}" stroke-width="2.4" stroke-linecap="round"></path><path d="M27 7.5a12.5 12.5 0 0 1 0 17" stroke="{{accent}}" stroke-width="2.4" stroke-linecap="round" opacity="0.55"></path></svg></sc-if>
+              <sc-if value="{{showTile}}" hint-placeholder-val="{{false}}"><svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="2" width="28" height="28" rx="{{tileRx}}" fill="{{accent}}"></rect><path d="M13 10.8v10.4a.8.8 0 0 0 1.2.7l8.3-5.2a.8.8 0 0 0 0-1.4l-8.3-5.2a.8.8 0 0 0-1.2.7z" fill="#0A0C10"></path></svg></sc-if>
+              <sc-if value="{{isWordmark}}" hint-placeholder-val="{{false}}"><span>pi<span style="color: {{accent}};">·</span>cast</span></sc-if>
+              <sc-if value="{{hasMark}}" hint-placeholder-val="{{true}}"><span>Pi-Cast</span></sc-if>
+            </div>
+            <span style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: {{t.surface}}; font-size: 12px; color: {{t.muted}};">
+              <span style="width: 7px; height: 7px; border-radius: 999px; background: {{accent}};"></span>
+              Living room TV
+            </span>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 14px; padding: 14px; border-radius: {{t.radius}}px; background: {{t.surface}}; border: 1px solid {{t.line}};">
+            <div style="height: 186px; border-radius: {{t.small}}px; background: #2A3140; display: flex; align-items: center; justify-content: center; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #8C96A8;">[ thumbnail ]</div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <span style="font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: {{accent}};">{{nowLabel}}</span>
+              <span style="font-size: 18px; font-weight: 600;">[Video title]</span>
+              <span style="font-size: 13px; color: {{t.muted}};">[Channel name] · YouTube</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <div style="height: 4px; border-radius: 999px; background: {{t.dim}};">
+                <div style="width: 38%; height: 4px; border-radius: 999px; background: {{accent}};"></div>
+              </div>
+              <div style="display: flex; justify-content: space-between; font-size: 11px; color: {{t.muted}}; font-family: 'JetBrains Mono', monospace;">
+                <span>12:04</span>
+                <span>31:47</span>
+              </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0 12px;">
+              <button type="button" aria-label="Back 10 seconds" style="width: 48px; height: 48px; border: 0; border-radius: 999px; background: transparent; color: {{t.text}}; display: flex; align-items: center; justify-content: center;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v5h5"></path></svg></button>
+              <button type="button" onClick="{{togglePlay}}" aria-label="{{playLabel}}" style="width: 68px; height: 68px; border: 0; border-radius: 999px; background: {{accent}}; color: #0A0C10; display: flex; align-items: center; justify-content: center;">
+                <sc-if value="{{playing}}" hint-placeholder-val="{{true}}"><svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect></svg></sc-if>
+                <sc-if value="{{paused}}" hint-placeholder-val="{{false}}"><svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.6v12.8a1 1 0 0 0 1.5.86l10.2-6.4a1 1 0 0 0 0-1.72L9.5 4.74A1 1 0 0 0 8 5.6z"></path></svg></sc-if>
+              </button>
+              <button type="button" aria-label="Forward 10 seconds" style="width: 48px; height: 48px; border: 0; border-radius: 999px; background: transparent; color: {{t.text}}; display: flex; align-items: center; justify-content: center;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"></path><path d="M21 4v5h-5"></path></svg></button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="{{t.muted}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7"></path></svg>
+              <label for="vol" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);">Volume</label>
+              <input id="vol" type="range" min="0" max="100" value="70" style="flex-grow: 1; accent-color: {{accent}};">
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label for="link" style="font-size: 13px; font-weight: 600; color: {{t.muted}};">Play a link</label>
+            <div style="display: flex; gap: 8px;">
+              <input id="link" type="url" placeholder="Paste a YouTube or Twitch link" style="flex-grow: 1; min-width: 0; height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: {{t.small}}px; border: 1px solid {{t.line}}; background: {{t.surface}}; color: {{t.text}}; font: inherit; font-size: 15px;">
+              <button type="button" style="height: 48px; padding: 0 18px; border: 0; border-radius: {{t.small}}px; background: {{accent}}; color: #0A0C10; font-size: 15px; font-weight: 600;">Play</button>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <span style="font-size: 13px; font-weight: 600; color: {{t.muted}};">Recent</span>
+            <sc-for list="{{recent}}" as="r" hint-placeholder-count="3">
+              <div style="display: flex; align-items: center; gap: 12px; min-height: 52px; border-bottom: 1px solid {{t.line}};">
+                <div style="width: 56px; height: 32px; flex-shrink: 0; border-radius: 4px; background: #2A3140;"></div>
+                <span style="flex-grow: 1; font-size: 14px;">{{r.title}}</span>
+                <span style="font-size: 11px; padding: 3px 8px; border-radius: 999px; border: 1px solid {{t.line}}; color: {{t.muted}};">{{r.source}}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </figure>
+
+    <div style="display: flex; flex-direction: column; gap: 48px; padding-top: 32px;">
+      <figure style="margin: 0; display: flex; flex-direction: column; gap: 14px;">
+        <figcaption style="font-size: 14px; color: {{t.muted}};"><strong style="color: {{t.text}}; font-weight: 600;">6 · Home Screen icon</strong></figcaption>
+        <div style="display: flex; align-items: flex-end; gap: 24px;">
+          <div style="width: 120px; height: 120px; border-radius: 28px; background: {{t.iconBg}}; display: flex; align-items: center; justify-content: center; border: 1px solid {{t.line}};">
+            <sc-if value="{{showBeam}}" hint-placeholder-val="{{true}}"><svg width="72" height="72" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M7 8.6v14.8a1.2 1.2 0 0 0 1.8 1l11.8-7.4a1.2 1.2 0 0 0 0-2L8.8 7.6A1.2 1.2 0 0 0 7 8.6z" fill="{{accent}}"></path><path d="M23.5 11a7.5 7.5 0 0 1 0 10" stroke="{{accent}}" stroke-width="2.4" stroke-linecap="round"></path><path d="M27 7.5a12.5 12.5 0 0 1 0 17" stroke="{{accent}}" stroke-width="2.4" stroke-linecap="round" opacity="0.55"></path></svg></sc-if>
+            <sc-if value="{{showTile}}" hint-placeholder-val="{{false}}"><svg width="84" height="84" viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="2" width="28" height="28" rx="{{tileRx}}" fill="{{accent}}"></rect><path d="M13 10.8v10.4a.8.8 0 0 0 1.2.7l8.3-5.2a.8.8 0 0 0 0-1.4l-8.3-5.2a.8.8 0 0 0-1.2.7z" fill="#0A0C10"></path></svg></sc-if>
+            <sc-if value="{{isWordmark}}" hint-placeholder-val="{{false}}"><span style="font-size: 44px; font-weight: 700; letter-spacing: -0.03em; color: {{t.text}};">pi<span style="color: {{accent}};">·</span></span></sc-if>
+          </div>
+          <div style="width: 60px; height: 60px; border-radius: 14px; background: {{t.iconBg}}; display: flex; align-items: center; justify-content: center; border: 1px solid {{t.line}};">
+            <sc-if value="{{showBeam}}" hint-placeholder-val="{{true}}"><svg width="36" height="36" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M7 8.6v14.8a1.2 1.2 0 0 0 1.8 1l11.8-7.4a1.2 1.2 0 0 0 0-2L8.8 7.6A1.2 1.2 0 0 0 7 8.6z" fill="{{accent}}"></path><path d="M23.5 11a7.5 7.5 0 0 1 0 10" stroke="{{accent}}" stroke-width="2.4" stroke-linecap="round"></path><path d="M27 7.5a12.5 12.5 0 0 1 0 17" stroke="{{accent}}" stroke-width="2.4" stroke-linecap="round" opacity="0.55"></path></svg></sc-if>
+            <sc-if value="{{showTile}}" hint-placeholder-val="{{false}}"><svg width="42" height="42" viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="2" width="28" height="28" rx="{{tileRx}}" fill="{{accent}}"></rect><path d="M13 10.8v10.4a.8.8 0 0 0 1.2.7l8.3-5.2a.8.8 0 0 0 0-1.4l-8.3-5.2a.8.8 0 0 0-1.2.7z" fill="#0A0C10"></path></svg></sc-if>
+            <sc-if value="{{isWordmark}}" hint-placeholder-val="{{false}}"><span style="font-size: 22px; font-weight: 700; letter-spacing: -0.03em; color: {{t.text}};">pi<span style="color: {{accent}};">·</span></span></sc-if>
+          </div>
+        </div>
+      </figure>
+
+      <figure style="margin: 0; display: flex; flex-direction: column; gap: 14px; width: 380px;">
+        <figcaption style="font-size: 14px; color: {{t.muted}};"><strong style="color: {{t.text}}; font-weight: 600;">7 · Share from YouTube / Twitch</strong> — an iOS Shortcut in the share sheet</figcaption>
+        <div style="display: flex; flex-direction: column; border-radius: 16px; overflow: hidden; background: #1C1C1E; color: #F2F2F7; font-family: -apple-system, system-ui, sans-serif;">
+          <div style="display: flex; align-items: center; justify-content: space-between; min-height: 52px; padding: 0 18px; border-bottom: 1px solid #2C2C2E; font-size: 16px;"><span>Copy</span><span style="color: #8E8E93;">⧉</span></div>
+          <div style="display: flex; align-items: center; justify-content: space-between; min-height: 52px; padding: 0 18px; border-bottom: 1px solid #2C2C2E; font-size: 16px; background: #2C2C2E;">
+            <span>Send to Pi-Cast</span>
+            <span style="width: 28px; height: 28px; border-radius: 7px; background: {{t.iconBg}}; display: flex; align-items: center; justify-content: center;">
+              <svg width="18" height="18" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M7 8.6v14.8a1.2 1.2 0 0 0 1.8 1l11.8-7.4a1.2 1.2 0 0 0 0-2L8.8 7.6A1.2 1.2 0 0 0 7 8.6z" fill="{{accent}}"></path></svg>
+            </span>
+          </div>
+          <div style="display: flex; align-items: center; min-height: 52px; padding: 0 18px; font-size: 16px; color: #8E8E93;"><span>Add to Reading List</span></div>
+        </div>
+        <p style="margin: 0; font-size: 13px; line-height: 1.5; color: {{t.muted}};">Tap Share in the YouTube or Twitch app → Send to Pi-Cast. It plays on the TV straight away.</p>
+      </figure>
+    </div>
+  </section>
+
+  <section aria-label="Settings" style="display: flex; gap: 56px; align-items: flex-start;">
+    <figure style="margin: 0; display: flex; flex-direction: column; gap: 12px;">
+      <figcaption style="font-size: 14px; color: {{t.muted}};"><strong style="color: {{t.text}}; font-weight: 600;">8 · TV settings</strong> — opened with OK on the home screen, arrows to change (needs CEC arrow keys)</figcaption>
+      <div style="width: 656px; height: 376px; box-sizing: border-box; padding: 8px; background: #000000; border-radius: 12px;">
+        <div style="width: 640px; height: 360px; position: relative; overflow: hidden; background: {{t.tv}}; color: {{t.text}};">
+          <div style="position: absolute; left: 32px; top: 28px; display: flex; flex-direction: column; gap: 2px; opacity: 0.35;">
+            <span style="font-size: 52px; font-weight: 600; letter-spacing: -0.03em; line-height: 1;">21:34</span>
+            <span style="font-size: 13px;">Saturday, 24 October</span>
+          </div>
+          <div style="position: absolute; top: 20px; right: 20px; bottom: 20px; width: 310px; box-sizing: border-box; padding: 18px; border-radius: {{t.radius}}px; background: {{t.glass}}; border: 1px solid {{t.line}}; display: flex; flex-direction: column; gap: 6px;">
+            <span style="font-size: 18px; font-weight: 600; margin-bottom: 4px;">Settings</span>
+            <div style="display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-radius: {{t.small}}px; border: 1px solid {{accent}}; background: {{accentSoft}};">
+              <span style="font-size: 12px; font-weight: 600;">Accent color</span>
+              <div style="display: flex; gap: 7px; flex-wrap: wrap;">
+                <sc-for list="{{accentOpts}}" as="o" hint-placeholder-count="10">
+                  <span style="width: 16px; height: 16px; border-radius: 999px; background: {{o.hex}}; {{o.dot}}"></span>
+                </sc-for>
+              </div>
+            </div>
+            <sc-for list="{{tvRows}}" as="r" hint-placeholder-count="5">
+              <div style="display: flex; justify-content: space-between; align-items: center; min-height: 30px; padding: 0 12px; font-size: 12px;">
+                <span>{{r.label}}</span>
+                <span style="color: {{t.muted}};">{{r.value}}</span>
+              </div>
+            </sc-for>
+            <span style="margin-top: auto; font-size: 10px; letter-spacing: 0.04em; color: {{t.muted}};">◀ ▶ change · OK select · Back close</span>
+          </div>
+        </div>
+      </div>
+    </figure>
+
+    <figure style="margin: 0; display: flex; flex-direction: column; gap: 12px;">
+      <figcaption style="font-size: 14px; color: {{t.muted}};"><strong style="color: {{t.text}}; font-weight: 600;">9 · iPhone settings</strong> — colors, toggles and the custom picker all work</figcaption>
+      <div style="width: 410px; height: 864px; box-sizing: border-box; padding: 10px; background: #000000; border-radius: 54px;">
+        <div style="width: 390px; height: 844px; box-sizing: border-box; padding: 56px 20px 28px; border-radius: 44px; overflow: hidden; background: {{t.phone}}; color: {{t.text}}; display: flex; flex-direction: column; gap: 16px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <button type="button" aria-label="Back" style="width: 44px; height: 44px; margin-left: -10px; border: 0; background: transparent; color: {{t.text}}; display: flex; align-items: center; justify-content: center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
+            <span style="font-size: 22px; font-weight: 600; letter-spacing: -0.01em;">Settings</span>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <span style="font-size: 13px; font-weight: 600; color: {{t.muted}};">Accent color</span>
+            <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; justify-items: center;">
+              <sc-for list="{{accentOpts}}" as="o" hint-placeholder-count="10">
+                <button type="button" onClick="{{o.pick}}" aria-label="{{o.label}}" aria-pressed="{{o.selected}}" style="width: 44px; height: 44px; border-radius: 999px; border: 0; background: {{o.hex}}; {{o.phoneRing}}"></button>
+              </sc-for>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 0 14px; border-radius: {{t.small}}px; background: {{t.surface}}; border: 1px solid {{t.line}};">
+              <label for="custom" style="font-size: 15px;">Custom color</label>
+              <input id="custom" type="color" value="{{accent}}" onChange="{{setCustom}}" style="width: 44px; height: 32px; border: 0; padding: 0; background: transparent;">
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <span style="font-size: 13px; font-weight: 600; color: {{t.muted}};">Look</span>
+            <div style="display: flex; gap: 8px;">
+              <sc-for list="{{styleOpts}}" as="o" hint-placeholder-count="3">
+                <button type="button" onClick="{{o.pick}}" aria-pressed="{{o.selected}}" style="flex-grow: 1; min-height: 44px; border: 1px solid; border-radius: {{t.small}}px; font-size: 14px; font-weight: 500; {{o.style}}">{{o.label}}</button>
+              </sc-for>
+            </div>
+            <div style="border-radius: {{t.small}}px; background: {{t.surface}}; border: 1px solid {{t.line}}; overflow: hidden;">
+              <sc-for list="{{lookRows}}" as="r" hint-placeholder-count="2">
+                <div style="display: flex; align-items: center; justify-content: space-between; min-height: 48px; padding: 0 14px; border-top: {{r.border}}; font-size: 15px;">
+                  <span>{{r.label}}</span>
+                  <sc-if value="{{r.isToggle}}" hint-placeholder-val="{{true}}">
+                    <button type="button" onClick="{{r.pick}}" aria-pressed="{{r.on}}" aria-label="{{r.label}}" style="width: 56px; height: 44px; border: 0; padding: 0; background: transparent; display: flex; align-items: center; justify-content: flex-end;"><span style="width: 46px; height: 28px; box-sizing: border-box; padding: 2px; border-radius: 999px; display: flex; {{r.track}}"><span style="width: 24px; height: 24px; border-radius: 999px; background: #FFFFFF;"></span></span></button>
+                  </sc-if>
+                  <sc-if value="{{r.isValue}}" hint-placeholder-val="{{false}}">
+                    <button type="button" style="min-height: 44px; border: 0; background: transparent; color: {{t.muted}}; font-size: 15px;">{{r.value}} ›</button>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <span style="font-size: 13px; font-weight: 600; color: {{t.muted}};">General</span>
+            <div style="border-radius: {{t.small}}px; background: {{t.surface}}; border: 1px solid {{t.line}}; overflow: hidden;">
+              <sc-for list="{{generalRows}}" as="r" hint-placeholder-count="4">
+                <div style="display: flex; align-items: center; justify-content: space-between; min-height: 48px; padding: 0 14px; border-top: {{r.border}}; font-size: 15px;">
+                  <span>{{r.label}}</span>
+                  <sc-if value="{{r.isToggle}}" hint-placeholder-val="{{true}}">
+                    <button type="button" onClick="{{r.pick}}" aria-pressed="{{r.on}}" aria-label="{{r.label}}" style="width: 56px; height: 44px; border: 0; padding: 0; background: transparent; display: flex; align-items: center; justify-content: flex-end;"><span style="width: 46px; height: 28px; box-sizing: border-box; padding: 2px; border-radius: 999px; display: flex; {{r.track}}"><span style="width: 24px; height: 24px; border-radius: 999px; background: #FFFFFF;"></span></span></button>
+                  </sc-if>
+                  <sc-if value="{{r.isValue}}" hint-placeholder-val="{{false}}">
+                    <button type="button" style="min-height: 44px; border: 0; background: transparent; color: {{t.muted}}; font-size: 15px;">{{r.value}} ›</button>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <span style="font-size: 13px; font-weight: 600; color: {{t.muted}};">TV remote (HDMI-CEC)</span>
+            <div style="border-radius: {{t.small}}px; background: {{t.surface}}; border: 1px solid {{t.line}}; overflow: hidden;">
+              <sc-for list="{{cecRows}}" as="r" hint-placeholder-count="2">
+                <div style="display: flex; align-items: center; justify-content: space-between; min-height: 48px; padding: 0 14px; border-top: {{r.border}}; font-size: 15px;">
+                  <span>{{r.label}}</span>
+                  <sc-if value="{{r.isToggle}}" hint-placeholder-val="{{true}}">
+                    <button type="button" onClick="{{r.pick}}" aria-pressed="{{r.on}}" aria-label="{{r.label}}" style="width: 56px; height: 44px; border: 0; padding: 0; background: transparent; display: flex; align-items: center; justify-content: flex-end;"><span style="width: 46px; height: 28px; box-sizing: border-box; padding: 2px; border-radius: 999px; display: flex; {{r.track}}"><span style="width: 24px; height: 24px; border-radius: 999px; background: #FFFFFF;"></span></span></button>
+                  </sc-if>
+                  <sc-if value="{{r.isValue}}" hint-placeholder-val="{{false}}">
+                    <button type="button" style="min-height: 44px; border: 0; background: transparent; color: {{t.muted}}; font-size: 15px;">{{r.value}} ›</button>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </div>
+    </figure>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":3320}}'>
+var ACCENTS = {
+  violet: { label: 'Violet', hex: '#A898FF' },
+  sky: { label: 'Sky', hex: '#6FA8FF' },
+  cyan: { label: 'Cyan', hex: '#3DD6F5' },
+  mint: { label: 'Mint', hex: '#4BE3B0' },
+  lime: { label: 'Lime', hex: '#B6F25A' },
+  amber: { label: 'Amber', hex: '#FFC247' },
+  coral: { label: 'Coral', hex: '#FF7A59' },
+  red: { label: 'Red', hex: '#FF5D5D' },
+  rose: { label: 'Rose', hex: '#FF7EB6' },
+  ice: { label: 'Ice', hex: '#E6ECF2' }
+};
+var FONTS = {
+  inter: { label: 'Inter', family: "'Inter', system-ui, sans-serif", note: 'Neutral and very legible from the sofa.' },
+  grotesk: { label: 'Space Grotesk', family: "'Space Grotesk', system-ui, sans-serif", note: 'Techy, a bit of character in the numbers.' },
+  sora: { label: 'Sora', family: "'Sora', system-ui, sans-serif", note: 'Wide and friendly, feels like a TV OS.' }
+};
+var MARKS = {
+  beam: { label: 'Beam', note: 'Play symbol sending waves: says “cast” at a glance.' },
+  tile: { label: 'Tile', note: 'Solid app-style tile, strongest as a Home Screen icon.' },
+  wordmark: { label: 'Wordmark', note: 'Text only, “pi·cast”. Quietest option.' }
+};
+function styleFor(id, accent) {
+  if (id === 'aurora') {
+    return {
+      label: 'Aurora', note: 'Dark with a soft accent glow. Most “premium TV” feel.',
+      page: '#0C0B14', panel: 'rgba(255,255,255,0.04)', surface: 'rgba(255,255,255,0.07)', phone: '#0F0E1A',
+      text: '#F5F3FF', muted: '#A9A6C4', dim: 'rgba(255,255,255,0.16)', line: 'rgba(255,255,255,0.10)',
+      tv: 'radial-gradient(60% 90% at 15% 0%, ' + accent + '40, transparent 60%), radial-gradient(50% 80% at 100% 100%, ' + accent + '26, transparent 60%), #0C0B14',
+      tvBase: '#0C0B14', glass: 'rgba(16,14,30,0.72)', iconBg: '#15132A', radius: 20, small: 12, pill: 999, tileRx: 9
+    };
+  }
+  if (id === 'studio') {
+    return {
+      label: 'Studio', note: 'Warm graphite, square corners, editorial. Calm and grown-up.',
+      page: '#171614', panel: '#1F1E1B', surface: '#25231F', phone: '#1A1917',
+      text: '#EEEBE4', muted: '#A9A59B', dim: '#3A3832', line: '#34322D',
+      tv: '#171614', tvBase: '#171614', glass: 'rgba(23,22,20,0.88)', iconBg: '#25231F', radius: 4, small: 3, pill: 4, tileRx: 3
+    };
+  }
+  return {
+    label: 'Midnight', note: 'Flat near-black, crisp and minimal. Lowest effort for the Pi.',
+    page: '#0A0C10', panel: '#11141A', surface: '#161A22', phone: '#0D1015',
+    text: '#F2F4F7', muted: '#98A2B3', dim: '#272C36', line: 'rgba(255,255,255,0.08)',
+    tv: '#0A0C10', tvBase: '#0A0C10', glass: 'rgba(10,12,16,0.82)', iconBg: '#11141A', radius: 14, small: 8, pill: 999, tileRx: 7
+  };
+}
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      style: 'aurora', accent: 'violet', customHex: '#A898FF', mark: 'wordmark', font: 'sora', playing: true,
+      glow: true, sponsor: true, clock24: true, cec: true, cecSwitch: true
+    };
+  }
+  renderVals() {
+    var s = this.state;
+    var self = this;
+    var accent = s.accent === 'custom' ? s.customHex : ACCENTS[s.accent].hex;
+    var accentName = s.accent === 'custom' ? 'Custom' : ACCENTS[s.accent].label;
+    var t = styleFor(s.style, accent);
+    var toggle = function (key, label) {
+      var on = !!s[key];
+      return {
+        label: label, isToggle: true, isValue: false, on: on, value: '',
+        track: on ? 'background: ' + accent + '; justify-content: flex-end;' : 'background: ' + t.dim + '; justify-content: flex-start;',
+        pick: function () { var u = {}; u[key] = !s[key]; self.setState(u); }
+      };
+    };
+    var value = function (label, v) {
+      return { label: label, isToggle: false, isValue: true, on: false, value: v, track: '', pick: null };
+    };
+    var rows = function (list) {
+      return list.map(function (r, i) { r.border = i === 0 ? 'none' : '1px solid ' + t.line; return r; });
+    };
+    var onOff = function (key) { return s[key] ? 'On' : 'Off'; };
+    var pill = function (selected) {
+      return selected
+        ? 'background: ' + accent + '; color: #0A0C10; border-color: ' + accent + ';'
+        : 'background: transparent; color: ' + t.text + '; border-color: ' + t.dim + ';';
+    };
+    var opts = function (key, map) {
+      return Object.keys(map).map(function (id) {
+        var sel = s[key] === id;
+        var o = { id: id, label: map[id].label, selected: sel, style: pill(sel), family: map[id].family || 'inherit' };
+        o.pick = function () { var u = {}; u[key] = id; self.setState(u); };
+        return o;
+      });
+    };
+    var styleOpts = ['midnight', 'aurora', 'studio'].map(function (id) {
+      var sel = s.style === id;
+      return { label: styleFor(id, accent).label, selected: sel, style: pill(sel), pick: function () { self.setState({ style: id }); } };
+    });
+    var accentOpts = Object.keys(ACCENTS).map(function (id) {
+      var sel = s.accent === id;
+      return {
+        label: ACCENTS[id].label, hex: ACCENTS[id].hex, selected: sel,
+        ring: sel ? 'box-shadow: 0 0 0 3px ' + t.page + ', 0 0 0 5px ' + t.text + ';' : '',
+        phoneRing: sel ? 'box-shadow: 0 0 0 3px ' + t.phone + ', 0 0 0 5px ' + t.text + ';' : '',
+        dot: sel ? 'box-shadow: 0 0 0 2px #0C0B14, 0 0 0 3.5px #FFFFFF;' : '',
+        pick: function () { self.setState({ accent: id }); }
+      };
+    });
+    return {
+      t: t,
+      accent: accent,
+      accentName: accentName,
+      accentSoft: accent + '1F',
+      isAurora: s.style === 'aurora',
+      blobA: s.glow ? 'pc-blob-a' : '',
+      blobB: s.glow ? 'pc-blob-b' : '',
+      blobAStyle: 'background: radial-gradient(circle, ' + accent + '73 0%, ' + accent + '00 66%);',
+      blobBStyle: 'background: radial-gradient(circle, ' + accent + '4D 0%, ' + accent + '00 66%);',
+      setCustom: function (e) { self.setState({ accent: 'custom', customHex: e.target.value }); },
+      lookRows: rows([toggle('glow', 'Animated boot glow')]),
+      generalRows: rows([
+        value('Device name', 'Pi-Cast'),
+        value('Twitch quality', '720p60'),
+        toggle('sponsor', 'Skip sponsor segments'),
+        toggle('clock24', '24-hour clock')
+      ]),
+      cecRows: rows([
+        toggle('cec', 'Control with TV remote'),
+        toggle('cecSwitch', 'Switch TV input on cast')
+      ]),
+      tvRows: [
+        { label: 'Style', value: '‹ ' + t.label + ' ›' },
+        { label: 'Animated boot', value: onOff('glow') },
+        { label: 'Skip sponsors', value: onOff('sponsor') },
+        { label: 'Clock', value: s.clock24 ? '24h' : '12h' },
+        { label: 'Switch TV input', value: onOff('cecSwitch') }
+      ],
+      font: FONTS[s.font].family,
+      styleOpts: styleOpts,
+      accentOpts: accentOpts,
+      markOpts: opts('mark', MARKS),
+      fontOpts: opts('font', FONTS),
+      styleNote: t.note,
+      markNote: MARKS[s.mark].note,
+      fontNote: FONTS[s.font].note,
+      summary: t.label + ' · ' + accentName + ' · ' + MARKS[s.mark].label + ' · ' + FONTS[s.font].label,
+      showBeam: s.mark === 'beam',
+      showTile: s.mark === 'tile',
+      isWordmark: s.mark === 'wordmark',
+      hasMark: s.mark !== 'wordmark',
+      tileRx: t.tileRx,
+      bootWordSize: s.mark === 'wordmark' ? 44 : 30,
+      playing: s.playing,
+      paused: !s.playing,
+      playLabel: s.playing ? 'Pause' : 'Play',
+      nowLabel: s.playing ? 'Playing on TV' : 'Paused',
+      togglePlay: function () { self.setState({ playing: !s.playing }); },
+      recent: [
+        { title: '[Recent video 1]', source: 'YouTube' },
+        { title: '[Streamer name]', source: 'Twitch' },
+        { title: '[Recent video 2]', source: 'YouTube' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

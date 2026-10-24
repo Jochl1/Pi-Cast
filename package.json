@@ -1,0 +1,18 @@
+{
+  "name": "pi-cast",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ad-free YouTube/Twitch cast receiver for the Raspberry Pi",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "yt-cast-receiver": "^2.1.0"
+  }
+}
