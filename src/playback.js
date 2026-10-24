@@ -3,6 +3,14 @@ import { classify } from './sources.js';
 import { lookup, youtubeId } from './metadata.js';
 import { edl } from './ytdl.js';
 
+// mpv restarts the hardware decoder on every loop-file seek, which flashes
+// the whole screen black on a Pi 3. The clip repeated back to back in an EDL
+// plays on without that (one segment to the next), and wraps around hourly.
+const CLIP_REPEATS = 120;
+const seamless = (file) => (file.endsWith('.mp4')
+  ? `edl://${Array(CLIP_REPEATS).fill(`%${Buffer.byteLength(file)}%${file}`).join(';')}`
+  : file);
+
 /**
  * Single owner of what's on screen. Both the cast receiver and the web UI go
  * through here, so they never fight over mpv.
@@ -48,6 +56,9 @@ export default class Playback extends EventEmitter {
     this.background = { file: null, loaded: null, id: null, showing: false, failed: null };
     // While the TV is off the backdrop stays loaded but paused, so it's there the moment the TV is back.
     this.standby = false;
+    // Reasons the backdrop holds still: 'standby' (paused), and 'panel' (overlay redraws
+    // over the moving clip flicker black on a Pi 3).
+    this.holds = new Set();
 
     mpv.on('ready', () => {
       // A (re)started mpv is idle.
@@ -101,8 +112,23 @@ export default class Playback extends EventEmitter {
 
   /** TV off: the backdrop holds still. The caller stops playback. */
   setStandby(on) {
-    if (this.standby === on) return;
     this.standby = on;
+    this.holdBackground('standby', on);
+  }
+
+  /**
+   * For the panel the clip crawls at 1% instead of pausing: resuming after
+   * the overlays changed flashed black, changing the speed doesn't.
+   */
+  async #holdSpeed() {
+    await this.mpv.set('speed', this.holds.has('panel') ? 0.01 : 1);
+  }
+
+  /** Holds the backdrop still while any `reason` holds it. */
+  holdBackground(reason, on) {
+    if (this.holds.has(reason) === on) return;
+    if (on) this.holds.add(reason);
+    else this.holds.delete(reason);
     if (!this.source) this.#toIdle();
   }
 
@@ -122,14 +148,16 @@ export default class Playback extends EventEmitter {
     const { file } = bg;
     if (!file || bg.failed === file) return false;
     if (bg.showing && bg.loaded === file) {
-      // Paused by play() (or for standby).
+      // Paused by play(), or held still.
       if (!!this.mpv.props.pause !== this.standby) await this.mpv.set('pause', this.standby);
+      await this.#holdSpeed();
       return true;
     }
     await this.mpv.set('image-display-duration', 'inf');
-    const id = await this.mpv.load(file, { loop: true, audio: false });
+    const id = await this.mpv.load(seamless(file), { loop: true, audio: false });
     Object.assign(bg, { loaded: file, id });
     if (this.standby) await this.mpv.pause(); // its first frame still shows
+    await this.#holdSpeed();
     return true;
   }
 

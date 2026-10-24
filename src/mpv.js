@@ -262,6 +262,7 @@ export default class Mpv extends EventEmitter {
     await this.set('force-media-title', title);
     await this.set('http-header-fields', headers);
     await this.set('loop-file', loop ? 'inf' : 'no');
+    await this.set('speed', 1);
     await this.set('pause', false);
     const result = await this.command('loadfile', url, 'replace');
     return result?.playlist_entry_id ?? null;

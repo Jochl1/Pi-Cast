@@ -25,6 +25,7 @@ const DOTS_MS = 250; // dots redraw interval (each redraw re-composites the over
 const DOTS_CYCLE_MS = 1200;
 // Short stalls don't get the buffering card.
 const BUFFERING_MS = 1000;
+const UNHOLD_MS = 400;
 
 /**
  * Everything drawn on the TV: home screen, loading, now-playing pop-ups,
@@ -133,6 +134,7 @@ export default class Tv {
     if (!this.panel.open) {
       if (k !== 'ok' || this.screen() !== 'home') return false;
       this.panel = { open: true, focus: 0 };
+      this.playback.holdBackground('panel', true);
       this.sounds.play('open');
       this.render();
       return true;
@@ -280,6 +282,14 @@ export default class Tv {
 
     for (const [name, events] of Object.entries(layers)) {
       await this.#send(name, events ? events.join('\n') : null);
+    }
+    // The backdrop moves again once the panel is gone: a little later, since
+    // mpv's redraw without it mustn't meet the clip starting to move.
+    clearTimeout(this.unholdTimer);
+    if (!this.panel.open && this.playback.holds.has('panel')) {
+      this.unholdTimer = setTimeout(() => {
+        if (!this.panel.open) this.playback.holdBackground('panel', false);
+      }, UNHOLD_MS);
     }
     this.#animateDots(screen === 'loading' || screen === 'buffering' ? t : null);
 
