@@ -162,6 +162,7 @@ streamlink with `--player-external-http` on `127.0.0.1`; Pi-Cast waits for its U
   - The Pi can't power itself off and on (a Pi 3 only boots again on power), so this is the closest to "off with the TV".
 - **Colour keys** (F1–F4: `0x71` blue, `0x72` red, `0x73` green, `0x74` yellow on the DYON) play the favourite in the `shortcuts` setting, on any screen, through `Playback.play` with owner `'web'` (so a cast session gets the usual takeover). An empty key shows a toast.
 - **Number keys aren't forwarded by the DYON TV**, tested both as a playback device (`-t p`) and as a recorder (`-t r`) with Pi-Cast as the active source. Only OK came through. That's why favourites are on the colour keys and not on digit codes.
+- **CH+/CH− aren't forwarded either** (CEC `0x30`/`0x31`), tested as a playback device (`-t p`) and as a tuner (`-t t`). Only OK came through.
 
 ### Web app
 
