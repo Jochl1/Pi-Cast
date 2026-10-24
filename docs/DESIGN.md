@@ -51,7 +51,7 @@ There are 10 presets plus a custom colour: Violet `#A898FF` (default), Sky `#6FA
 1. **Boot splash (Plymouth):** the wordmark centred, three dots below it (the middle one in the accent), "STARTING UP" at the bottom, and the two glows drifting slowly on 14–18 s loops. The "Animated boot" setting freezes them.
 2. **Home:** the backdrop above, a large clock (24h/12h) and the date at the top left, and "Ready to cast" with a one-line hint in the centre.
    - **Weather** at the top right, opposite the clock (when a place is set): the icon and temperature, the condition with today's high/low, and the next three days in columns (day, icon, high and muted low). It ends well above the glass card. The icons are ASS shapes (`tv/weatherIcons.js`): sun and moon in the accent, clouds in the text colour.
-   - **Key hints** above a thin divider: the colour keys' favourites as coloured dots with names on the left, and "▲ Instagram" on the right while logged in.
+   - **Key hints** above a thin divider: the colour keys' favourites as coloured dots with names on the left, and "▲ Instagram" on the right while logged in. A Twitch favourite that's live gets a red "LIVE" pill after its name, and its name turns from muted to the text colour. Names are measured in the font (`tv/measure.js` reads Sora's advance widths), because the character-count estimate put the pill on top of names like "Trymacs".
    - **Below the divider:** the web remote's QR code (no caption), the TV code (pairing code) and the network (WLAN + network name with the Wi-Fi icon) on the left, and a large wordmark on the right. The user dropped the remote's address and the "Scan with your phone camera" text for a calmer look.
 3. **Loading:** shown while a new item starts. "LOADING" in the accent, the title, and channel · source · "from <sender>" in the glass card in the middle, with three dots below it that pulse one after another (the middle one in the accent).
    - From home it sits on the backdrop's card. When casting over a playing video, the old video freezes, dimmed, under a glass card of the same size.
@@ -95,6 +95,8 @@ Node 22 (ESM), with `express`, `yt-cast-receiver` and `qrcode` as the only depen
 | `instagram.js` | Instagram worker (`bin/insta.py`) and the login state. |
 | `reels.js` | Reels on the TV: the list, scrolling, likes, keys. |
 | `airplay.js` | AirPlay state and metadata from shairport-sync's pipe; ends a session. |
+| `twitchLive.js` | Which Twitch favourites are live: one GQL query (Twitch's public web client ID, as streamlink uses) for all of them every 3 min, skipped in standby. |
+| `tv/measure.js` | Text widths from the Sora font files (`head`, `hhea`, `hmtx`, `cmap` format 4), for placing things after text. |
 
 ### Playback ownership
 
@@ -299,7 +301,6 @@ The Pi 3 throttles from 1200 to 600 MHz on undervoltage (`vcgencmd get_throttled
 ### Ideas for later (from the user, not designed yet)
 
 - **Party games with the phone as controller:** Pong, Connect 4, tic-tac-toe and other simple games. The TV shows the game; phones join through the web app (QR code) and send input over the same HTTP/SSE channel.
-- **Colour key legend, more:** the home screen shows the favourites now; for Twitch favourites it could also show who's live right now.
 - **Profiles:** a "Who's watching?" picker at startup, like Netflix, chosen with the arrow keys. Each profile has its own colour keys, accent, Recent list, language and, later, Instagram account.
 - **AirPlay screen mirroring** from the iPhone, with UxPlay (open-source AirPlay server; GStreamer, hardware H.264 through v4l2). It's an experiment on a Pi 3:
   - **The display:** UxPlay draws through its own GStreamer sink and needs the display, which mpv holds. So mpv would have to step aside while mirroring (be stopped and started again afterwards, with a black flash), or UxPlay's H.264 would have to be fed to mpv.

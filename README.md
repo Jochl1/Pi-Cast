@@ -102,7 +102,7 @@ TV remote keys:
 | Play, Pause, Stop, ⏪ ⏩ | | | what they say | what they say |
 | Red, green, yellow, blue | play that key's favourite | play that key's favourite | switch to that key's favourite | switch to that key's favourite |
 
-The colour-key favourites are set in the web app under Settings → Colour keys (red is Trymacs and green is BigSpin by default). Number keys would have been nicer, but the DYON TV doesn't send them over CEC.
+The colour-key favourites are set in the web app under Settings → Colour keys (red is Trymacs and green is BigSpin by default). The home screen lists them above the divider; a Twitch favourite that's live right now gets a red LIVE tag. Number keys would have been nicer, but the DYON TV doesn't send them over CEC.
 
 Some TVs don't pass arrow keys over CEC. Everything in the TV's settings panel is also available in the web app.
 

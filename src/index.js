@@ -9,6 +9,7 @@ import Instagram from './instagram.js';
 import Reels from './reels.js';
 import Weather, { findPlace } from './weather.js';
 import AirPlay from './airplay.js';
+import TwitchLive from './twitchLive.js';
 import Playback from './playback.js';
 import Cast from './cast.js';
 import Settings, { streamlinkQuality } from './settings.js';
@@ -141,8 +142,10 @@ airplay.on('session', (on) => {
 });
 const weather = new Weather({ settings, log });
 weather.start();
+const twitchLive = new TwitchLive({ settings, playback, log });
+twitchLive.start();
 const tv = new Tv({
-  mpv, playback, cast, settings, sounds, reels, weather, instagram, airplay, log,
+  mpv, playback, cast, settings, sounds, reels, weather, instagram, airplay, twitchLive, log,
   remote: `${os.hostname()}.local:${config.webPort}`,
 });
 tv.start();

@@ -27,7 +27,7 @@ const homeState = {
       { date: '2026-10-27', code: 0, max: 14.8, min: 5.5 },
     ],
   },
-  keys: [{ hex: '#FF5D5D', name: 'Trymacs' }, { hex: '#4BE3B0', name: 'BigSpin' }],
+  keys: [{ hex: '#FF5D5D', name: 'Trymacs', live: true }, { hex: '#4BE3B0', name: 'BigSpin' }],
   instagram: true,
 };
 const video = {
@@ -87,7 +87,7 @@ export const scenes = {
           { date: '2026-10-27', code: 45, max: 3, min: -1 },
         ],
       },
-      keys: [{ hex: '#FF5D5D', name: 'Trymacs' }, { hex: '#4BE3B0', name: 'BigSpin' }, { hex: '#FFD23F', name: 'Lofi Girl' }, { hex: '#4D7CFF', name: 'Kurzgesagt' }],
+      keys: [{ hex: '#FF5D5D', name: 'Trymacs', live: true }, { hex: '#4BE3B0', name: 'BigSpin', live: true }, { hex: '#FFD23F', name: 'Lofi Girl', live: true }, { hex: '#4D7CFF', name: 'Kurzgesagt' }],
     })],
   },
   airplay: {

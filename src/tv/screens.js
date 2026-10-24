@@ -4,6 +4,7 @@ import {
   text, span, paint, rect, circle, shape, arcBand, escape, fit, textWidth, qrShape,
 } from './ass.js';
 import { weatherIcon, weatherKind } from './weatherIcons.js';
+import { measure } from './measure.js';
 
 /**
  * Pure layout functions: state in, ASS events out. Coordinates are 1920x1080
@@ -178,21 +179,35 @@ function weather(t, w) {
   return events;
 }
 
+const LIVE_RED = '#FF4D5E';
+
 /**
  * A row above the divider: the colour keys' favourites on the left
- * (`keys` = [{ hex, name }]), and "▲ Instagram" on the right while logged in.
+ * (`keys` = [{ hex, name, live }]; a live Twitch channel gets a red "LIVE"
+ * pill and a brighter name), and "▲ Instagram" on the right while logged in.
+ * Names are measured in the font, so the pills never overlap them.
  */
 function keyHints(t, keys, instagram) {
   const y = LINE_Y - 52;
   const events = [];
   let x = PAD_X;
-  for (const { hex, name } of keys) {
-    const label = escape(fit(name, 30, 300));
+  for (const { hex, name, live } of keys) {
+    const short = fit(name, 30, 300);
+    const nameW = measure(short, 30) ?? textWidth(short, 30, 0.6);
     events.push(
       circle(x + 10, y, 10, { color: hex }),
-      text(label, { x: x + 10 + 22, y, an: 4, px: 30, color: t.muted }),
+      text(escape(short), { x: x + 32, y, an: 4, px: 30, color: live ? t.text : t.muted }),
     );
-    x += 10 + 22 + textWidth(label, 30, 0.53) + 48;
+    x += 32 + nameW;
+    if (live) {
+      const pillW = 74;
+      events.push(
+        rect(x + 16, y - 17, pillW, 34, { color: LIVE_RED, radius: 17 }),
+        text('LIVE', { x: x + 16 + pillW / 2, y, an: 5, px: 20, weight: 600, spacing: 2, color: '#FFFFFF' }),
+      );
+      x += 16 + pillW;
+    }
+    x += 48;
   }
   if (instagram) {
     events.push(
