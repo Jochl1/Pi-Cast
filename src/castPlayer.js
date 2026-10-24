@@ -14,14 +14,22 @@ export default class CastPlayer extends Player {
     this.mpv = mpv;
     this.log = log;
 
-    playback.on('takeover', (previous) => {
+    this.onTakeover = (previous) => {
       if (previous === 'cast') {
         this.notifyExternalStateChange(PLAYER_STATUSES.STOPPED).catch(() => {});
       }
-    });
-    playback.on('ended', ({ owner, reason }) => {
+    };
+    this.onEnded = ({ owner, reason }) => {
       if (owner === 'cast') this.#onEnded(reason);
-    });
+    };
+    playback.on('takeover', this.onTakeover);
+    playback.on('ended', this.onEnded);
+  }
+
+  /** Detaches from Playback, when the receiver is recreated (e.g. renamed). */
+  dispose() {
+    this.playback.off('takeover', this.onTakeover);
+    this.playback.off('ended', this.onEnded);
   }
 
   // The receiver doesn't detect end of playback itself; advancing the queue is up to us.

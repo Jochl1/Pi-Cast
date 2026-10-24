@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Pi-Cast">
+  <meta name="theme-color" content="#0F0E1A">
+  <meta name="format-detection" content="telephone=no">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="preload" href="/fonts/sora-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/app.css">
+  <title>Pi-Cast</title>
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+
+<main id="remote" class="view">
+  <header class="top">
+    <div class="wordmark" aria-label="Pi-Cast">pi<span class="accent">·</span>cast</div>
+    <div class="top-right">
+      <span class="pill" id="tv-pill"><span class="led" aria-hidden="true"></span><span id="tv-name">Pi-Cast</span></span>
+      <a class="icon-btn" href="#settings" aria-label="Settings">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+      </a>
+    </div>
+  </header>
+
+  <section class="card now" aria-label="Now playing">
+    <div class="thumb" id="thumb">
+      <img id="thumb-img" alt="" hidden>
+      <span class="thumb-mark" aria-hidden="true">pi<span class="accent">·</span>cast</span>
+    </div>
+    <div class="meta">
+      <div class="meta-head">
+        <span class="label" id="state-label">Nothing playing</span>
+        <button type="button" class="text-btn" id="stop" hidden>Stop</button>
+      </div>
+      <span class="title" id="title">Ready to cast</span>
+      <span class="sub" id="sub">Open YouTube and tap Cast → Pi-Cast</span>
+    </div>
+    <div class="progress" id="progress">
+      <div class="bar"><div class="fill" id="progress-fill"></div></div>
+      <div class="times mono"><span id="elapsed">0:00</span><span id="total">0:00</span></div>
+    </div>
+    <div class="transport">
+      <button type="button" class="round-btn" id="back" aria-label="Back 10 seconds">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+      </button>
+      <button type="button" class="play-btn" id="play" aria-label="Play">
+        <svg class="icon-pause" width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+        <svg class="icon-play" width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.6v12.8a1 1 0 0 0 1.5.86l10.2-6.4a1 1 0 0 0 0-1.72L9.5 4.74A1 1 0 0 0 8 5.6z"/></svg>
+      </button>
+      <button type="button" class="round-btn" id="forward" aria-label="Forward 10 seconds">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>
+      </button>
+    </div>
+    <div class="volume">
+      <button type="button" class="vol-btn" id="mute" aria-label="Mute">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path class="wave" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="cross" d="m16 9 5 6M21 9l-5 6"/></svg>
+      </button>
+      <label for="volume" class="sr-only">Volume</label>
+      <input id="volume" type="range" min="0" max="100" value="100">
+    </div>
+  </section>
+
+  <form class="play-link" id="play-form">
+    <label for="link" class="section-label">Play a link</label>
+    <div class="row">
+      <input id="link" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste a YouTube or Twitch link">
+      <button type="submit" class="accent-btn">Play</button>
+    </div>
+  </form>
+
+  <section class="recent" aria-labelledby="recent-heading">
+    <h2 class="section-label" id="recent-heading">Recent</h2>
+    <ul id="recent-list"></ul>
+    <p class="empty" id="recent-empty">Things you play show up here.</p>
+  </section>
+</main>
+
+<main id="settings" class="view" hidden>
+  <header class="top settings-top">
+    <a class="icon-btn back" href="#" aria-label="Back">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+    </a>
+    <h1>Settings</h1>
+  </header>
+
+  <section class="group">
+    <h2 class="section-label">Accent color</h2>
+    <div class="swatches" id="swatches"></div>
+    <div class="list">
+      <label class="row-item" for="custom-color">
+        <span>Custom color</span>
+        <input id="custom-color" type="color" value="#A898FF">
+      </label>
+    </div>
+  </section>
+
+  <section class="group">
+    <h2 class="section-label">Look</h2>
+    <div class="segmented" id="styles" role="group" aria-label="Style"></div>
+    <div class="list">
+      <div class="row-item"><span>Animated boot glow</span><button type="button" class="switch" data-setting="bootAnimation" aria-label="Animated boot glow"><span></span></button></div>
+    </div>
+  </section>
+
+  <section class="group">
+    <h2 class="section-label">General</h2>
+    <div class="list">
+      <label class="row-item" for="device-name">
+        <span>Device name</span>
+        <input id="device-name" class="value-input" type="text" maxlength="40" enterkeyhint="done" autocomplete="off">
+      </label>
+      <label class="row-item" for="twitch-quality">
+        <span>Twitch quality</span>
+        <span class="value-select">
+          <span id="twitch-quality-value"></span> ›
+          <select id="twitch-quality" aria-label="Twitch quality"></select>
+        </span>
+      </label>
+      <div class="row-item"><span>Skip sponsor segments</span><button type="button" class="switch" data-setting="sponsorBlock" aria-label="Skip sponsor segments"><span></span></button></div>
+      <div class="row-item"><span>24-hour clock</span><button type="button" class="switch" data-setting="clock24" aria-label="24-hour clock"><span></span></button></div>
+    </div>
+  </section>
+
+  <section class="group">
+    <h2 class="section-label">TV remote (HDMI-CEC)</h2>
+    <div class="list">
+      <div class="row-item"><span>Control with TV remote</span><button type="button" class="switch" data-setting="cecEnabled" aria-label="Control with TV remote"><span></span></button></div>
+      <div class="row-item"><span>Switch TV input on cast</span><button type="button" class="switch" data-setting="cecSwitchInput" aria-label="Switch TV input on cast"><span></span></button></div>
+    </div>
+  </section>
+
+  <section class="group">
+    <h2 class="section-label">Pairing</h2>
+    <div class="list">
+      <div class="row-item"><span>TV code</span><span class="value mono" id="tv-code">—</span></div>
+    </div>
+    <p class="hint">If Pi-Cast doesn't show up under Cast: in the YouTube app, open Settings → Watch on TV → Enter TV code.</p>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+</body>
+</html>

@@ -13,7 +13,7 @@ function venvBin(name) {
 }
 
 const defaults = {
-  // Name shown in the YouTube app's cast menu.
+  // Name shown in the YouTube app's cast menu until changed in settings.
   deviceName: 'Pi-Cast',
   webPort: 8080,
   dialPort: 3000,
@@ -29,9 +29,6 @@ const defaults = {
 
   ytdlPath: venvBin('yt-dlp'),
   streamlinkPath: venvBin('streamlink'),
-  streamlinkPort: 8890,
-  // First available quality wins. 1080p60 is too much for a Pi 3.
-  twitchQuality: '720p60,720p,480p,best',
 
   logLevel: 'info',
 };

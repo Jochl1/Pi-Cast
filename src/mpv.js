@@ -5,7 +5,9 @@ import net from 'node:net';
 import path from 'node:path';
 import { ROOT } from './config.js';
 
-const OBSERVED = ['pause', 'time-pos', 'duration', 'volume', 'mute', 'idle-active', 'media-title'];
+// time-pos isn't observed: it changes every frame, which is a lot of IPC
+// traffic for a Pi 3. It's polled once a second during playback instead.
+const OBSERVED = ['pause', 'duration', 'volume', 'mute', 'idle-active', 'media-title', 'paused-for-cache'];
 const SCRIPTS_DIR = path.join(ROOT, 'mpv-scripts');
 
 /**
@@ -13,6 +15,7 @@ const SCRIPTS_DIR = path.join(ROOT, 'mpv-scripts');
  * talks to it over its JSON IPC socket. Restarts mpv if it crashes.
  *
  * Events: 'property' (name, value), 'end-file' (reason), 'start-file', 'file-loaded', 'ready'
+ * ('property' also fires for the polled 'time-pos')
  */
 export default class Mpv extends EventEmitter {
   constructor(config, log) {
@@ -21,8 +24,12 @@ export default class Mpv extends EventEmitter {
     this.log = log;
     this.props = {
       pause: false, 'time-pos': 0, duration: 0, volume: 100, mute: false,
-      'idle-active': true, 'media-title': null,
+      'idle-active': true, 'media-title': null, 'paused-for-cache': false,
     };
+    // Decides which scripts in mpv-scripts/ get loaded (e.g. SponsorBlock on/off).
+    this.scriptFilter = () => true;
+    this.quickRestart = false;
+    setInterval(() => this.#pollPosition(), 1000);
     this.pending = new Map();
     this.nextId = 1;
     this.socket = null;
@@ -47,11 +54,23 @@ export default class Mpv extends EventEmitter {
     }
   }
 
+  /** Restarts mpv on purpose, e.g. to load a different set of scripts. */
+  async restart() {
+    this.log.info('restarting mpv');
+    this.quickRestart = true;
+    try { await this.command('quit'); } catch { this.proc?.kill(); }
+  }
+
   #scheduleRestart(why) {
     if (this.shuttingDown || this.restartTimer) return;
-    const delay = this.restartDelay;
-    this.restartDelay = Math.min(delay * 2, 60000);
-    this.log.error(`mpv ${why}, restarting in ${delay / 1000}s`);
+    let delay = 100;
+    if (this.quickRestart) {
+      this.quickRestart = false;
+    } else {
+      delay = this.restartDelay;
+      this.restartDelay = Math.min(delay * 2, 60000);
+      this.log.error(`mpv ${why}, restarting in ${delay / 1000}s`);
+    }
     this.restartTimer = setTimeout(() => {
       this.restartTimer = null;
       this.start();
@@ -69,7 +88,7 @@ export default class Mpv extends EventEmitter {
     if (process.platform !== 'win32') fs.rmSync(mpvSocket, { force: true });
 
     const scripts = fs.existsSync(SCRIPTS_DIR)
-      ? fs.readdirSync(SCRIPTS_DIR).filter((f) => f.endsWith('.lua')).map((f) => `--script=${path.join(SCRIPTS_DIR, f)}`)
+      ? fs.readdirSync(SCRIPTS_DIR).filter((f) => f.endsWith('.lua') && this.scriptFilter(f)).map((f) => `--script=${path.join(SCRIPTS_DIR, f)}`)
       : [];
 
     const args = [
@@ -179,13 +198,27 @@ export default class Mpv extends EventEmitter {
     });
   }
 
+  get(name) {
+    return this.command('get_property', name);
+  }
+
+  async #pollPosition() {
+    if (!this.socket || this.props['idle-active']) return;
+    try {
+      const pos = await this.get('time-pos');
+      this.props['time-pos'] = pos ?? 0;
+      this.emit('property', 'time-pos', pos);
+    } catch { /* not available while loading */ }
+  }
+
   set(name, value) {
     return this.command('set_property', name, value);
   }
 
-  async load(url, { start = 0 } = {}) {
-    // 'start' is a global option, so reset it on every load.
+  async load(url, { start = 0, title = '' } = {}) {
+    // 'start' and 'force-media-title' are global options, so reset them on every load.
     await this.set('start', start > 0 ? String(start) : 'none');
+    await this.set('force-media-title', title);
     await this.set('pause', false);
     await this.command('loadfile', url, 'replace');
   }

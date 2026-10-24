@@ -13,7 +13,7 @@ export default class Streamlink {
   }
 
   /** Starts streamlink for `url` and resolves with the local URL mpv should open. */
-  async open(url, quality = this.config.twitchQuality) {
+  async open(url, quality) {
     await this.close();
     const { streamlinkPath } = this.config;
     // No --player-external-http-port: a random free port avoids clashing with

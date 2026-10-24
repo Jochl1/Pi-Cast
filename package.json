@@ -7,7 +7,7 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "check": "node -e \"for (const f of require('fs').readdirSync('src')) require('child_process').execFileSync(process.execPath, ['--check', 'src/' + f], { stdio: 'inherit' })\""
+    "check": "node scripts/check.js"
   },
   "engines": {
     "node": ">=22"
