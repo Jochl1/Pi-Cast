@@ -83,6 +83,7 @@ Node 22 (ESM), with `express`, `yt-cast-receiver` and `qrcode` as the only depen
 | `boot.js`, `render.js`, `icons.js` | Boot splash images, SVG to PNG via `rsvg-convert` (cached by content), app icons. |
 | `tv/background.js` | Paints the home backdrop (PNG) and finds its loop clip. |
 | `network.js` | Wi-Fi status via `nmcli`. |
+| `sounds.js` | UI sounds and the startup sound, through `bin/sounds.py` (see below). |
 
 ### Playback ownership
 
@@ -164,6 +165,14 @@ streamlink with `--player-external-http` on `127.0.0.1`; Pi-Cast waits for its U
 - Live state comes over SSE (`/api/events`), with no polling.
 - iOS web apps can't be share targets, which is why the Shortcut exists. It POSTs `{url}` to `/api/play`.
 
+### Sounds
+
+- Seven UI sounds (move, select, open, close, notify, like, error) are synthesized by `scripts/render-sounds.js` into `assets/sounds/*.wav` (48 kHz, 16-bit stereo). The same script converts `assets/sounds/startup.mp3` to `startup.wav` and trims its trailing silence. The startup sound is not in git: its licence wasn't checked for redistribution.
+- `bin/sounds.py` plays them through libasound (ctypes, standard library only), on mpv's ALSA device behind `plug:`. While it holds the device it writes silence between sounds (10 ms writes, 60 ms latency), so the TV keeps its audio input awake and short sounds aren't swallowed.
+- The device takes one program at a time (§4.5), so the helper holds it only while nothing plays and mpv's `current-ao` is unset. `mpv.load()` awaits `beforeLoad` for anything but the backdrop: the helper lets go first, after letting a sound that's still playing finish (at most 1 s). After a stop, mpv closes its audio output once the backdrop (which has no audio) shows, and the helper takes the device back.
+- So there are no UI sounds during a video or over a paused one.
+- Triggers: the settings panel (open, move, select, close) and toasts (notify; error for "Couldn't play" and unset colour keys). The startup sound plays the first time the helper gets the device, if the app started within 5 minutes of boot.
+
 ### Settings side effects
 
 | Setting | Effect |
@@ -174,6 +183,7 @@ streamlink with `--player-external-http` on `127.0.0.1`; Pi-Cast waits for its U
 | Twitch quality | Takes effect on the next stream. |
 | SponsorBlock | Restart mpv when idle. |
 | Clock | Redraw the home screen. |
+| Sounds | UI sounds and the startup sound on/off (checked when a sound would play). |
 | Language | Redraw the overlays, re-label the web app, regenerate the boot splash ("STARTING UP" / "WIRD GESTARTET"). |
 | CEC toggles | Start or stop CEC; switch the input on cast. |
 
@@ -226,6 +236,12 @@ Measured on a Pi 3 with Raspberry Pi OS Lite 64-bit (Trixie, mpv 0.40, Mesa 26).
 
 The Pi 3 throttles from 1200 to 600 MHz on undervoltage (`vcgencmd get_throttled` reports `0x50005`). That roughly halves everything CPU-bound, yt-dlp especially, and writing to the SD card on low voltage corrupts it. Use the official 5.1 V / 2.5 A supply.
 
+### 4.5 Audio
+
+- HDMI audio is card `vc4hdmi`, with a single subdevice. The `hdmi:` device is an `iec958` plugin over `hw`, so `dmix` can't sit under it (it would mix IEC958 subframes). A second program gets `EBUSY` while mpv has it open.
+- mpv closes its audio output when the next file has no audio (the backdrop), and keeps it open while a video is paused.
+- The sounds helper takes about 0% CPU while it writes silence.
+
 ## 5. Open work
 
 - **Faster YouTube start.** What's left of the ~7 s is mostly network (~1.5 s) and Node solving the challenge (2–4 s).
@@ -236,5 +252,4 @@ The Pi 3 throttles from 1200 to 600 MHz on undervoltage (`vcgencmd get_throttled
 ### Ideas for later (from the user, not designed yet)
 
 - **Instagram on the TV:** Reels/feed scrolled with the remote's arrow keys, a like button (OK), and login by scanning a QR code on the TV with the phone.
-- **UI sounds:** a small, clean sound set for navigation, opening the panel, toasts and playback start.
 - **Party games with the phone as controller:** Pong, Connect 4, tic-tac-toe and other simple games. The TV shows the game; phones join through the web app (QR code) and send input over the same HTTP/SSE channel.

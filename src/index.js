@@ -16,6 +16,7 @@ import ReceiverStore from './receiverStore.js';
 import Tv from './tv/tv.js';
 import Cec from './cec.js';
 import BootSplash from './boot.js';
+import Sounds from './sounds.js';
 import { KEY_COLORS, themeFor } from './shared/theme.js';
 import { translator } from './shared/i18n.js';
 
@@ -110,8 +111,10 @@ settings.on('change', (values, changed) => {
 });
 
 // --- TV screens ---
+const sounds = new Sounds({ config, mpv, playback, settings, log });
+sounds.start();
 const tv = new Tv({
-  mpv, playback, cast, settings, log,
+  mpv, playback, cast, settings, sounds, log,
   remote: `${os.hostname()}.local:${config.webPort}`,
 });
 tv.start();
@@ -141,13 +144,13 @@ function playShortcut(color) {
   const shortcut = settings.get().shortcuts[color];
   const keyName = tr(`key${color[0].toUpperCase()}${color.slice(1)}`);
   if (!shortcut) {
-    tv.toast(tr('shortcutUnset', { key: keyName }), { dot: KEY_COLORS[color] });
+    tv.toast(tr('shortcutUnset', { key: keyName }), { dot: KEY_COLORS[color], sound: 'error' });
     return;
   }
   tv.toast(shortcut.name, { dot: KEY_COLORS[color] });
   playback.play(shortcut.url, { owner: 'web' }).catch((e) => {
     log.warn(`${color} key: ${e.message}`);
-    tv.toast(tr('couldntPlay'));
+    tv.toast(tr('couldntPlay'), { sound: 'error' });
   });
 }
 

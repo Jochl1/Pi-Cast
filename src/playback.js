@@ -117,7 +117,7 @@ export default class Playback extends EventEmitter {
       return true;
     }
     await this.mpv.set('image-display-duration', 'inf');
-    const id = await this.mpv.load(file, { loop: true });
+    const id = await this.mpv.load(file, { loop: true, audio: false });
     Object.assign(bg, { loaded: file, id });
     return true;
   }

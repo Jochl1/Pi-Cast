@@ -17,6 +17,8 @@ const SCHEMA = {
   customAccent: { def: '#A898FF', ok: isHex },
   // Drifting glows on the boot splash and the home backdrop.
   bootAnimation: { def: true, ok: bool },
+  // UI sounds and the startup sound.
+  sounds: { def: true, ok: bool },
   sponsorBlock: { def: true, ok: bool },
   clock24: { def: true, ok: bool },
   language: { def: 'en', ok: (v) => v in LANGUAGES },

@@ -4,7 +4,7 @@ An ad-free "Chromecast" for a Raspberry Pi 3. It shows up as a cast target in th
 
 - **YouTube:** cast from the YouTube app. Videos are fetched directly with yt-dlp, so YouTube ads never play. Sponsor segments are skipped with SponsorBlock.
 - **Twitch and other links:** paste them into the web app, or use Share → **Send to Pi-Cast**. streamlink filters out Twitch's ad breaks.
-- **TV:** animated boot splash, a home screen with a clock, now-playing pop-ups, a pause screen and a settings panel. No Linux text on screen.
+- **TV:** animated boot splash, a home screen with a clock, now-playing pop-ups, a pause screen and a settings panel. Soft menu sounds and an optional startup sound. No Linux text on screen.
 
 What it can't do: Netflix or other DRM services, and casting from the Twitch app (Google only allows certified Cast devices).
 
@@ -51,7 +51,7 @@ Pi-Cast picks them up the next time it starts or the accent changes, while "Anim
 1. Open **http://picast.local:8080** in Safari, or scan the QR code on the TV's home screen with the camera.
 2. Tap **Share → Add to Home Screen**.
 
-You get the remote (play/pause, ±10 s, volume, "Play a link", Recent) and all settings (accent color, animations, language (English/German), device name, Twitch quality, SponsorBlock, clock, TV remote options).
+You get the remote (play/pause, ±10 s, volume, "Play a link", Recent) and all settings (accent color, animations, sounds, language (English/German), device name, Twitch quality, SponsorBlock, clock, TV remote options).
 
 ### "Send to Pi-Cast" in the share sheet
 
@@ -124,6 +124,7 @@ Settings from the web app are stored in `data/settings.json`. Lower-level option
 - **No sound:** check `mpvAudioDevice` against `mpv --audio-device=help`.
 - **TV remote does nothing:** `cec-client -l` should list an adapter. Stop Pi-Cast (`sudo systemctl stop picast`) and run `cec-client -t p -d 8`, then press keys: lines with `>> 04:44:xx` mean the TV sends them. `cec-ctl -d /dev/cec0 --playback && cec-ctl -d /dev/cec0 --monitor` is another view.
 - **Pi-Cast not in the Cast menu:** phone and Pi must be on the same Wi-Fi network, and some routers block discovery between devices ("client isolation"). Pair with the TV code instead (see above).
+- **Startup sound:** put an mp3 at `assets/sounds/startup.mp3`, run `node scripts/render-sounds.js` (needs ffmpeg) and copy `assets/sounds/startup.wav` to the Pi. It plays once when the home screen first appears after boot. The menu sounds are made by the same script.
 - **Boot splash:** it updates after a look change, but only shows from the next boot. To rebuild it by hand: `node scripts/boot-splash.js && sudo /usr/local/sbin/picast-plymouth-update`.
 
 ## Development

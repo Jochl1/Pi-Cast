@@ -32,8 +32,8 @@ const BUFFERING_MS = 1000;
  * visible changes, since every redraw costs CPU on a Pi 3.
  */
 export default class Tv {
-  constructor({ mpv, playback, cast, settings, log, remote }) {
-    Object.assign(this, { mpv, playback, cast, settings, log, remote });
+  constructor({ mpv, playback, cast, settings, sounds, log, remote }) {
+    Object.assign(this, { mpv, playback, cast, settings, sounds, log, remote });
     this.sent = {};
     this.panel = { open: false, focus: 0 };
     this.card = null; // { until, quality }
@@ -70,7 +70,7 @@ export default class Tv {
     playback.on('started', () => this.#onStarted());
     playback.on('change', () => this.render());
     playback.on('ended', ({ reason }) => {
-      if (reason === 'error') this.toast(screens.look(this.settings.get()).tr('couldntPlay'));
+      if (reason === 'error') this.toast(screens.look(this.settings.get()).tr('couldntPlay'), { sound: 'error' });
     });
     cast.on('senderConnect', (name) => {
       this.sender = { name, until: Date.now() + POPUP_MS };
@@ -118,9 +118,10 @@ export default class Tv {
     }
   }
 
-  /** Shows a short message; `dot` = color of a dot in front of it. */
-  toast(text, { dot = null } = {}) {
+  /** Shows a short message; `dot` = color of a dot in front of it, `sound` = UI sound to play. */
+  toast(text, { dot = null, sound = 'notify' } = {}) {
     this.message = { text, dot, until: Date.now() + TOAST_MS };
+    this.sounds.play(sound);
     this.render();
   }
 
@@ -132,20 +133,25 @@ export default class Tv {
     if (!this.panel.open) {
       if (k !== 'ok' || this.screen() !== 'home') return false;
       this.panel = { open: true, focus: 0 };
+      this.sounds.play('open');
       this.render();
       return true;
     }
     const rows = screens.PANEL_ROWS;
     const row = rows[this.panel.focus];
+    const { focus } = this.panel;
     switch (k) {
-      case 'up': this.panel.focus = Math.max(0, this.panel.focus - 1); break;
-      case 'down': this.panel.focus = Math.min(rows.length - 1, this.panel.focus + 1); break;
+      case 'up': this.panel.focus = Math.max(0, focus - 1); break;
+      case 'down': this.panel.focus = Math.min(rows.length - 1, focus + 1); break;
       case 'left': this.#change(row.key, -1); break;
       case 'right': this.#change(row.key, 1); break;
       case 'ok': this.#change(row.key, 1); break;
       case 'back': this.panel.open = false; break;
       default: return false;
     }
+    if (k === 'back') this.sounds.play('close');
+    else if (k === 'up' || k === 'down') { if (this.panel.focus !== focus) this.sounds.play('move'); }
+    else this.sounds.play('select');
     this.render();
     return true;
   }

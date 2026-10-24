@@ -7,7 +7,8 @@ import { ROOT } from './config.js';
 
 // time-pos isn't observed: it changes every frame, which is a lot of IPC
 // traffic for a Pi 3. It's polled once a second during playback instead.
-const OBSERVED = ['pause', 'duration', 'volume', 'mute', 'idle-active', 'media-title', 'paused-for-cache'];
+// current-ao is set while mpv has the audio device open.
+const OBSERVED = ['pause', 'duration', 'volume', 'mute', 'idle-active', 'media-title', 'paused-for-cache', 'current-ao'];
 const SCRIPTS_DIR = path.join(ROOT, 'mpv-scripts');
 
 /**
@@ -27,8 +28,10 @@ export default class Mpv extends EventEmitter {
     this.log = log;
     this.props = {
       pause: false, 'time-pos': 0, duration: 0, volume: 100, mute: false,
-      'idle-active': true, 'media-title': null, 'paused-for-cache': false,
+      'idle-active': true, 'media-title': null, 'paused-for-cache': false, 'current-ao': null,
     };
+    // Awaited before loading anything that may have sound (the UI sounds let go of the device).
+    this.beforeLoad = null;
     // Decides which scripts in mpv-scripts/ get loaded (e.g. SponsorBlock on/off).
     this.scriptFilter = () => true;
     this.quickRestart = false;
@@ -249,9 +252,11 @@ export default class Mpv extends EventEmitter {
 
   /**
    * `headers`: HTTP header lines ("Name: value") for the stream requests.
+   * `audio`: false for files without sound (the backdrop).
    * Resolves to the new playlist entry's id.
    */
-  async load(url, { start = 0, title = '', headers = [], loop = false } = {}) {
+  async load(url, { start = 0, title = '', headers = [], loop = false, audio = true } = {}) {
+    if (audio) await this.beforeLoad?.();
     // These are global options, so reset them on every load.
     await this.set('start', start > 0 ? String(start) : 'none');
     await this.set('force-media-title', title);

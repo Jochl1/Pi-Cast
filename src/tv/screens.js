@@ -273,6 +273,7 @@ export const PANEL_ROWS = [
   { key: 'accent', label: 'rowAccent' },
   { key: 'language', label: 'rowLanguage' },
   { key: 'bootAnimation', label: 'rowAnimations' },
+  { key: 'sounds', label: 'rowSounds' },
   { key: 'sponsorBlock', label: 'rowSponsors' },
   { key: 'clock24', label: 'rowClock' },
   { key: 'cecSwitchInput', label: 'rowSwitchInput' },
