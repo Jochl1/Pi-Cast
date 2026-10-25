@@ -273,11 +273,24 @@ async function endSplash() {
 }
 await endSplash();
 // Splash, then the startup sound, then the home screen.
-playback.once('backdrop', () => sounds.booted());
+const startedAt = Date.now();
+playback.once('backdrop', () => {
+  log.info(`home screen up ${((Date.now() - startedAt) / 1000).toFixed(1)} s after the splash`);
+  sounds.booted();
+});
 // Doesn't wait for mpv: it retries in the background if it can't start.
 mpv.start();
-ytdl.start();
-instagram.start();
+// The Python workers start once the home screen is up (or after 30 s), so
+// they don't slow mpv's start on the Pi 3 while the screen is black.
+let workersStarted = false;
+function startWorkers() {
+  if (workersStarted) return;
+  workersStarted = true;
+  ytdl.start();
+  instagram.start();
+}
+playback.once('backdrop', startWorkers);
+setTimeout(startWorkers, 30000).unref();
 await cast.start(settings.get().deviceName);
 
 const web = createWebServer({
