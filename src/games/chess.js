@@ -88,6 +88,7 @@ export default {
   max: 2,
 
   create(seats, round) {
+    stockfish.warm();
     return {
       moves: [], sans: [], white: round % 2, turn: round % 2, offer: null, declined: null, over: false, winner: null, result: null,
     };
