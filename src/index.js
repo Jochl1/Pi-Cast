@@ -13,6 +13,7 @@ import Party from './games/party.js';
 import Weather, { findPlace } from './weather.js';
 import AirPlay from './airplay.js';
 import TwitchLive from './twitchLive.js';
+import YoutubeLive from './youtubeLive.js';
 import Playback from './playback.js';
 import Cast from './cast.js';
 import Settings, { streamlinkQuality } from './settings.js';
@@ -182,6 +183,8 @@ const weather = new Weather({ settings, log });
 weather.start();
 const twitchLive = new TwitchLive({ settings, playback, log });
 twitchLive.start();
+const youtubeLive = new YoutubeLive({ settings, playback, log });
+youtubeLive.start();
 /**
  * The settings panel's power row. A Pi 3 only starts again when its power is
  * reconnected. The toast shows for a moment first; systemd then stops Pi-Cast
@@ -196,7 +199,7 @@ function powerOff() {
   }, 1500);
 }
 const tv = new Tv({
-  mpv, playback, cast, settings, sounds, reels, weather, instagram, airplay, twitchLive, party, log,
+  mpv, playback, cast, settings, sounds, reels, weather, instagram, airplay, twitchLive, youtubeLive, party, log,
   remote: `${os.hostname()}.local:${config.webPort}`, powerOff,
 });
 tv.start();
@@ -284,6 +287,7 @@ function setStandby(on) {
   else {
     weather.refresh();
     twitchLive.refresh();
+    youtubeLive.refresh();
   }
   // Not when the TV was woken by a cast: the video is already on its way.
   if (!on && !playback.source) sounds.startup();

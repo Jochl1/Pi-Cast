@@ -47,10 +47,10 @@ const HISTORY = 30;
  */
 export default class Tv {
   constructor({
-    mpv, playback, cast, settings, sounds, reels, weather, instagram, airplay, twitchLive, party, log, remote, powerOff,
+    mpv, playback, cast, settings, sounds, reels, weather, instagram, airplay, twitchLive, youtubeLive, party, log, remote, powerOff,
   }) {
     Object.assign(this, {
-      mpv, playback, cast, settings, sounds, reels, weather, instagram, airplay, twitchLive, party, log, remote, powerOff,
+      mpv, playback, cast, settings, sounds, reels, weather, instagram, airplay, twitchLive, youtubeLive, party, log, remote, powerOff,
     });
     this.cover = { image: null, want: null }; // AirPlay's cover: the image and its bitmap
     this.sent = {};
@@ -103,6 +103,7 @@ export default class Tv {
     this.party.on('change', () => this.render());
     this.weather.on('change', () => this.render());
     this.twitchLive.on('change', () => this.render());
+    this.youtubeLive.on('change', () => this.render());
     // The ▲ Instagram hint shows while logged in.
     this.instagram.on('change', () => this.render());
     this.airplay.on('change', (state) => {
@@ -350,7 +351,7 @@ export default class Tv {
         panelOpen: this.panel.open,
         weather: this.weather.data,
         keys: Object.entries(KEY_COLORS).filter(([color]) => s.shortcuts[color]).map(([color, hex]) => ({
-          hex, name: s.shortcuts[color].name, live: this.twitchLive.isLive(s.shortcuts[color].url),
+          hex, name: s.shortcuts[color].name, live: this.twitchLive.isLive(s.shortcuts[color].url) || this.youtubeLive.isLive(s.shortcuts[color].url),
         })),
         instagram: !!this.instagram.state.user,
       });

@@ -105,7 +105,7 @@ TV remote keys:
 
 On game night the remote does the host's lobby jobs: ◀ ▶ pick a game, OK start it (and play again after a round), Back leaves (during a game, press it twice to end the game). The moves themselves are made on the phones.
 
-The colour-key favourites are set in the web app under Settings → Colour keys (red is Trymacs and green is BigSpin by default). The home screen lists them above the divider; a Twitch favourite that's live right now gets a red LIVE tag. Number keys would have been nicer, but the DYON TV doesn't send them over CEC.
+The colour-key favourites are set in the web app under Settings → Colour keys (red is Trymacs and green is BigSpin by default). The home screen lists them above the divider; a Twitch channel that's live right now, or a YouTube live stream that's on air, gets a red LIVE tag. Number keys would have been nicer, but the DYON TV doesn't send them over CEC.
 
 Some TVs don't pass arrow keys over CEC. Everything in the TV's settings panel is also available in the web app, except **Power off** (the last row; press OK twice). A Raspberry Pi 3 can't switch itself back on: after Power off, unplug its power and plug it back in to start it again.
 
