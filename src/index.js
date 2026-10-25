@@ -217,12 +217,17 @@ cec.on('key', remoteKey);
 playback.on('play', () => {
   if (settings.get().cecEnabled && settings.get().cecSwitchInput) cec.switchInput();
 });
-// TV off: stop, and the home screen holds still. TV on: it moves again, with the startup sound.
+// TV off: stop, and the home screen holds still. TV on: it moves again, with the startup sound,
+// and the widgets (weather, LIVE tags) are fetched again.
 function setStandby(on) {
   if (on === playback.standby) return;
   log.info(on ? 'TV is off: standby' : 'TV is on: waking up');
   playback.setStandby(on); // first, so stopping brings the backdrop back paused
   if (on) playback.stop().catch((e) => log.warn('stopping for standby failed:', e.message));
+  else {
+    weather.refresh();
+    twitchLive.refresh();
+  }
   // Not when the TV was woken by a cast: the video is already on its way.
   if (!on && !playback.source) sounds.startup();
 }

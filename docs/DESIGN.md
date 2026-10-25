@@ -89,13 +89,13 @@ Node 22 (ESM), with `express`, `yt-cast-receiver` and `qrcode` as the only depen
 | `cec.js` | TV remote over `cec-client`. |
 | `boot.js`, `render.js`, `icons.js` | Boot splash images, SVG to PNG via `rsvg-convert` (cached by content), app icons. |
 | `tv/background.js` | Paints the home backdrop (PNG) and finds its loop clip. |
-| `weather.js` | Weather for the home screen from Open-Meteo (free, no key), refreshed every 30 min; place lookup by name. |
+| `weather.js` | Weather for the home screen from Open-Meteo (free, no key), refreshed every 30 min and when the TV wakes up; place lookup by name. |
 | `network.js` | Wi-Fi status via `nmcli`. |
 | `sounds.js` | UI sounds and the startup sound, through `bin/sounds.py` (see below). |
 | `instagram.js` | Instagram worker (`bin/insta.py`) and the login state. |
 | `reels.js` | Reels on the TV: the list, scrolling, likes, keys. |
 | `airplay.js` | AirPlay state and metadata from shairport-sync's pipe; ends a session. |
-| `twitchLive.js` | Which Twitch favourites are live: one GQL query (Twitch's public web client ID, as streamlink uses) for all of them every 3 min, skipped in standby. |
+| `twitchLive.js` | Which Twitch favourites are live: one GQL query (Twitch's public web client ID, as streamlink uses) for all of them every 3 min and when the TV wakes up, skipped in standby. |
 | `tv/measure.js` | Text widths from the Sora font files (`head`, `hhea`, `hmtx`, `cmap` format 4), for placing things after text. |
 
 ### Playback ownership
@@ -191,7 +191,7 @@ streamlink with `--player-external-http` on `127.0.0.1`; Pi-Cast waits for its U
 - Arrow-key passthrough varies by TV, so every TV setting is also in the web app.
 - **Standby with the TV** ("Sleep when the TV is off", `cecStandby`): the DYON sends no STANDBY (`0x36`) when it turns off, so Pi-Cast sends `pow 0` every 10 s (3 s while the TV is off). It reads both the TV's real REPORT_POWER_STATUS (`>> 04:90:xx`) and cec-client's `power status:` answer.
   - That answer usually comes from libcec's cache, which only asks the TV about every 30 s, so noticing "off" takes up to ~30 s. The cache flips to on as soon as the TV reappears on the bus (`0f:84`, `0f:86`), so waking is seen within the 3 s poll. Reading only the real replies made waking take ~20 s.
-  - TV off: playback stops and the home backdrop stays loaded but paused (`Playback.setStandby`), so the picture is there the instant the TV is back. TV on: the backdrop moves again and the startup sound plays, unless the TV was woken by a cast.
+  - TV off: playback stops and the home backdrop stays loaded but paused (`Playback.setStandby`), so the picture is there the instant the TV is back. TV on: the backdrop moves again, the weather and LIVE tags are fetched again, and the startup sound plays, unless the TV was woken by a cast.
   - The HDMI connector stays `connected` while the TV is off, so hotplug can't be used.
   - The Pi can't power itself off and on (a Pi 3 only boots again on power), so this is the closest to "off with the TV".
 - **Colour keys** (F1–F4: `0x71` blue, `0x72` red, `0x73` green, `0x74` yellow on the DYON) play the favourite in the `shortcuts` setting, on any screen, through `Playback.play` with owner `'web'` (so a cast session gets the usual takeover). An empty key shows a toast.

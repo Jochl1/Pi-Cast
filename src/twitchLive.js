@@ -14,7 +14,7 @@ export function twitchChannel(url) {
 
 /**
  * Which Twitch favourites (colour keys) are live, for the home screen's
- * "LIVE" tags. One request for all of them every 3 minutes, skipped while
+ * "LIVE" tags. One request for all of them every 3 minutes and on wake-up, skipped while
  * the TV is in standby.
  *
  * Events: 'change'
@@ -29,9 +29,9 @@ export default class TwitchLive extends EventEmitter {
 
   start() {
     this.settings.on('change', (values, changed) => {
-      if (changed.includes('shortcuts')) this.#poll();
+      if (changed.includes('shortcuts')) this.refresh();
     });
-    this.#poll();
+    this.refresh();
   }
 
   isLive(url) {
@@ -39,9 +39,9 @@ export default class TwitchLive extends EventEmitter {
     return !!channel && this.live.has(channel);
   }
 
-  async #poll() {
+  async refresh() {
     clearTimeout(this.timer);
-    this.timer = setTimeout(() => this.#poll(), POLL_MS);
+    this.timer = setTimeout(() => this.refresh(), POLL_MS);
     this.timer.unref();
     const channels = [...new Set(Object.values(this.settings.get().shortcuts)
       .map((s) => twitchChannel(s?.url)).filter(Boolean))];

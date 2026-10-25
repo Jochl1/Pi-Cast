@@ -10,7 +10,7 @@ const TIMEOUT_MS = 15000;
 
 /**
  * Weather for the home screen, from Open-Meteo (free, no key), for the place
- * in the `weatherPlace` setting. Refreshed every 30 minutes.
+ * in the `weatherPlace` setting. Refreshed every 30 minutes and when the TV wakes up.
  *
  * data: { current: { temp, code, day }, days: [{ date, code, max, min }] }
  * with today first, or null.
@@ -27,9 +27,9 @@ export default class Weather extends EventEmitter {
 
   start() {
     this.settings.on('change', (values, changed) => {
-      if (changed.includes('weatherPlace')) this.#refresh();
+      if (changed.includes('weatherPlace')) this.refresh();
     });
-    this.#refresh();
+    this.refresh();
   }
 
   /** The current weather, or null if there's no place or the data is too old. */
@@ -40,7 +40,7 @@ export default class Weather extends EventEmitter {
     return r.data;
   }
 
-  async #refresh() {
+  async refresh() {
     clearTimeout(this.timer);
     const place = this.settings.get().weatherPlace;
     if (!place) {
@@ -58,7 +58,7 @@ export default class Weather extends EventEmitter {
       this.log.warn(`weather for ${place.name} failed: ${e.message}`);
       wait = RETRY_MS;
     }
-    this.timer = setTimeout(() => this.#refresh(), wait);
+    this.timer = setTimeout(() => this.refresh(), wait);
     this.timer.unref();
   }
 }
