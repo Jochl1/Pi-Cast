@@ -58,7 +58,7 @@ There are 10 presets plus a custom colour: Violet `#A898FF` (default), Sky `#6FA
    - The same card says "BUFFERING" when a video stalls for more than a second.
 4. **Now-playing pop-ups** that fade after about 5 s: a "<sender> connected" pill at the top right; a card at the bottom left with the thumbnail, "NOW PLAYING" in the accent, the title, and the source and quality; and a thin accent progress line.
 5. **Paused:** dimmed video, a pause icon in an accent ring, and at the bottom the title, channel and source, an accent progress bar, and the elapsed and total times in mono.
-6. **TV settings panel:** a glass panel on the right over the dimmed home screen. Rows: accent (a swatch row), language, animations, skip sponsors, clock, switch TV input. Footer: "◀ ▶ change · OK select · Back close". OK on the home screen opens it; the arrows and Back navigate it.
+6. **TV settings panel:** a glass panel on the right over the dimmed home screen, which hides its glass card. Rows: accent (a swatch row), language, animations, skip sponsors, clock, switch TV input. Footer: "◀ ▶ change · OK select · Back close". OK on the home screen opens it; the arrows and Back navigate it.
 7. **Instagram Reels:** ▲ on the home screen opens them. The Reel plays upright in the middle (mpv's `background-color` fills the sides). Left: "INSTAGRAM" in the accent above "Reels", and the keys at the bottom. Right, bottom-aligned: @user, up to four caption lines (muted) and the like count with a ♥, filled in the accent once liked. OK likes with a big ♥ that fades out over the Reel. Pause shows the accent pause ring. Between Reels only the dots show in the middle, no loading card.
 8. **AirPlay**, like a poster: the clock and date at the top left as on the home screen, the cover (620 px, rounded) on the right, and at the bottom left "● AIRPLAY" (with "· PAUSED" when paused), the title (96 px, 72 px if long), artist — album, and an accent progress bar with times. It sits on the same backdrop as home, without the glass card. (A Spotify screen in this style was approved first; see AirPlay below for why it's AirPlay.)
 9. **Toasts** for short messages, such as "Couldn't play that link", or "● Trymacs" (with the key's colour) when a colour key starts a favourite.
@@ -124,6 +124,7 @@ Node 22 (ESM), with `express`, `yt-cast-receiver` and `qrcode` as the only depen
 
 - yt-dlp comes from `.venv` (`yt-dlp[default]`, which includes `yt-dlp-ejs`).
 - Format (`ytdlFormat` in `config.js`, also passed to mpv): H.264 (avc1) at 1080p30 or lower, with AAC audio. VP9 and AV1 can't be hardware-decoded on a Pi 3.
+  - YouTube live streams only have separate video and audio, and the audio's codec is reported as unknown, so the last choice takes any audio with the H.264 video (the AAC-only choices failed with "Requested format is not available").
 - yt-dlp needs a JS runtime for YouTube's challenges: `js-runtimes=node`. Node ≥ 22 from NodeSource only exists for arm64, so the Pi must run the **64-bit** OS.
 - **The yt-dlp worker** (`src/ytdl.js` and `bin/ytdl.py worker`) is a Python process that stays running and resolves YouTube links to direct stream URLs.
   - Playback stops the old video, asks the worker, and loads an `edl://` that joins the video and audio streams, with yt-dlp's HTTP headers.

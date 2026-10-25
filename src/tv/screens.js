@@ -225,7 +225,7 @@ function keyHints(t, keys, instagram) {
 export function home(t, {
   now, clock24, net, pairingCode, qr, deviceName, loading, panelOpen, weather: w, keys = [], instagram = false,
 }) {
-  if (panelOpen) return [glassCard(), ...clock(t, now, clock24, 0.35)];
+  if (panelOpen) return clock(t, now, clock24, 0.35);
 
   const events = [glassCard(), ...clock(t, now, clock24), ...bottomBar(t, { pairingCode, qr, net })];
   if (w) events.push(...weather(t, w));
