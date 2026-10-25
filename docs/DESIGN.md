@@ -274,7 +274,7 @@ Measured on a Pi 3 with Raspberry Pi OS Lite 64-bit (Trixie, mpv 0.40, Mesa 26).
 - **Blur is expensive:** libass pads blurred bitmaps heavily. Even one blurred ring per glow didn't fit home plus the settings panel.
 - **A shape with `\bord` makes two full-size bitmaps** (fill and border).
 - So: no full-screen shapes and no big blurred glows in the overlays. The home backdrop is a picture on the video plane instead (§3, TV renderer).
-- Test the worst case (home plus settings panel plus toast) with `scripts/check-osd.js` after any layout change.
+- Test the worst case (home plus settings panel plus toast) with `scripts/check-osd.js` after any layout change. It runs every scene in one mpv (about 25 s on the Pi) and only gives each scene its own mpv from the first failure on, since an overflow is sticky; arguments filter by scene name (`check-osd.js games`, about 8 s).
 - `overlay-add` bitmaps (thumbnails) use a separate texture, but mpv always draws them **above** every ASS overlay. That's why the glow isn't a bitmap background behind the text.
 - mpv removes a client's `osd-overlay`s when that IPC client disconnects. Test scripts must keep the socket open while someone looks at the TV.
 - Tried without success: the glows as a single ASS event on the normal OSD-text texture (`osd-msg1` with `${osd-ass-cc/0}`). It fit, but nothing showed. The cause is unknown (possibly idle, `osd-level` or the markup).
@@ -316,6 +316,8 @@ The Pi 3 throttles from 1200 to 600 MHz on undervoltage (`vcgencmd get_throttled
 ### Ideas for later (from the user, not designed yet)
 
 - **Party games with the phone as controller:** Pong, Connect 4, tic-tac-toe and other simple games. The TV shows the game; phones join through the web app (QR code) and send input over the same HTTP/SSE channel.
+- **More game night games:** rock paper scissors (everyone picks on their phone, the TV reveals) and a slot machine (spin on the phone, the reels run on the TV).
+- **LIVE badge for YouTube live streams**, like the Twitch favourites' LIVE tag (a colour-key favourite that is a YouTube live stream, e.g. the lofi radio).
 - **Profiles:** a "Who's watching?" picker at startup, like Netflix, chosen with the arrow keys. Each profile has its own colour keys, accent, Recent list, language and, later, Instagram account.
 - **AirPlay screen mirroring** from the iPhone, with UxPlay (open-source AirPlay server; GStreamer, hardware H.264 through v4l2). It's an experiment on a Pi 3:
   - **The display:** UxPlay draws through its own GStreamer sink and needs the display, which mpv holds. So mpv would have to step aside while mirroring (be stopped and started again afterwards, with a black flash), or UxPlay's H.264 would have to be fed to mpv.
