@@ -119,8 +119,27 @@ playback.on('change', () => {
 mpv.on('log', (text) => {
   if (!text.includes('OSD bitmaps do not fit') || mpvRestartPending) return;
   log.warn(`overlays didn't fit (screen ${tv.screen()}: ${tv.layerSummary()}); restarting mpv when idle`);
+  saveOsdSnapshot();
   restartMpvWhenIdle();
 });
+
+// The journal lives in RAM on Raspberry Pi OS and is gone after a reboot, so
+// the overflow also goes to a file: `node scripts/check-osd.js <file>` replays it.
+const OSD_DIR = path.join(DATA_DIR, 'osd-overflow');
+const OSD_KEEP = 10;
+function saveOsdSnapshot() {
+  try {
+    const { kind, url, title } = playback.source || {};
+    const snapshot = { at: new Date().toISOString(), playing: kind ? { kind, url, title } : null, ...tv.osdSnapshot() };
+    fs.mkdirSync(OSD_DIR, { recursive: true });
+    const file = path.join(OSD_DIR, `${snapshot.at.replace(/[:.]/g, '-')}.json`);
+    fs.writeFileSync(file, JSON.stringify(snapshot, null, 1));
+    log.warn('overflow snapshot saved to', file);
+    for (const old of fs.readdirSync(OSD_DIR).sort().slice(0, -OSD_KEEP)) fs.rmSync(path.join(OSD_DIR, old));
+  } catch (e) {
+    log.error('overflow snapshot failed:', e.message);
+  }
+}
 
 settings.on('change', (values, changed) => {
   log.info('settings changed:', changed.join(', '));

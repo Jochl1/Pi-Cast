@@ -31,6 +31,8 @@ const UNHOLD_MS = 400;
 const PULSE_MS = 700;
 // How long the power row waits for its second OK.
 const POWER_CONFIRM_MS = 4000;
+// Layer changes kept for the overflow snapshot.
+const HISTORY = 30;
 
 /**
  * Everything drawn on the TV: home screen, loading, now-playing pop-ups,
@@ -47,7 +49,8 @@ export default class Tv {
     });
     this.cover = { image: null, want: null }; // AirPlay's cover: the image and its bitmap
     this.sent = {};
-    this.panel = { open: false, focus: 0, powerConfirm: null }; // powerConfirm: a timer while it waits
+    this.history = []; // the last layer changes, newest last
+    this.panel ={ open: false, focus: 0, powerConfirm: null }; // powerConfirm: a timer while it waits
     this.card = null; // { until, quality }
     this.sender = null; // { name, until }
     this.message = null; // { text, until }
@@ -440,6 +443,12 @@ export default class Tv {
       .map(([name, data]) => `${name} ${data.split('\n').length} events ${Math.round(data.length / 1024)} kB`).join(', ') || 'none';
   }
 
+  /** Every layer's ASS and the last layer changes, for the overflow snapshot (DESIGN §4.2). */
+  osdSnapshot() {
+    const layers = Object.fromEntries(Object.entries(this.sent).filter(([name, data]) => LAYERS[name] && data));
+    return { screen: this.screen(), layers, history: this.history };
+  }
+
   async #send(name, data) {
     if (this.sent[name] === data) return;
     const { id, z } = LAYERS[name];
@@ -447,6 +456,13 @@ export default class Tv {
       if (data === null) await this.mpv.clearOverlay({ id });
       else await this.mpv.showOverlay(data, { id, z });
       this.sent[name] = data;
+      // The dots redraw 4× a second; one entry per run of them is enough.
+      const last = this.history.at(-1);
+      if (name === 'dots' && last?.layer === 'dots' && data) last.at = new Date().toISOString();
+      else {
+        this.history.push({ at: new Date().toISOString(), layer: name, bytes: data?.length ?? null });
+        if (this.history.length > HISTORY) this.history.shift();
+      }
     } catch (e) {
       delete this.sent[name]; // retried on the next draw
       this.log.warn(`TV overlay "${name}" failed:`, e.message);
