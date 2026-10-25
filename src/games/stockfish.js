@@ -5,14 +5,30 @@ import readline from 'node:readline';
 // Debian installs it to /usr/games, which isn't on a systemd service's PATH.
 const BINARY = fs.existsSync('/usr/games/stockfish') ? '/usr/games/stockfish' : 'stockfish';
 
-// How the computer plays at levels 1–5: Stockfish's skill (0–20) and time per move.
+// How the computer plays at levels 1–5, as lichess does it: Stockfish's skill
+// (0–20; below 20 it picks among its best few moves, with natural-looking
+// mistakes), capped by search depth and time per move. Skill 0 is still too
+// good for level 1, so there pi·cast itself picks from Stockfish's best 8
+// moves, weighted by how good they are: a move `pick` centipawns worse is
+// e times less likely. It misses tactics like a beginner, but never plays nonsense.
 const LEVELS = [
-  { skill: 0, ms: 50, depth: 1 },
-  { skill: 3, ms: 100, depth: 3 },
-  { skill: 8, ms: 300 },
-  { skill: 14, ms: 700 },
-  { skill: 20, ms: 1500 },
+  { pick: 120, depth: 4, ms: 100 },
+  { skill: 3, depth: 5, ms: 100 },
+  { skill: 7, depth: 5, ms: 200 },
+  { skill: 11, depth: 8, ms: 400 },
+  { skill: 20, depth: 14, ms: 1000 },
 ];
+const PICK_FROM = 8;
+const MATE = 100000;
+
+/** A move from `candidates` ({ move, score }), the better ones likelier. */
+function weightedPick(candidates, temperature) {
+  const best = Math.max(...candidates.map((c) => c.score));
+  const weights = candidates.map((c) => Math.exp((Math.max(c.score, best - 2000) - best) / temperature));
+  let r = Math.random() * weights.reduce((a, b) => a + b, 0);
+  for (const [i, w] of weights.entries()) if ((r -= w) <= 0) return candidates[i];
+  return candidates[0];
+}
 // A search that hangs (or a dead engine) must not stop the game.
 const TIMEOUT_MS = 10000;
 
@@ -62,25 +78,32 @@ class Stockfish {
   }
 
   /**
-   * The best move for the side to move after `moves` (UCI, e.g. ['e2e4', 'e7e5']),
-   * at `level` 1–5: { move: 'g1f3', score } with the score in centipawns for
-   * the side to move (mate as ±100000).
+   * pi·cast's move for the side to move after `moves` (UCI, e.g. ['e2e4', 'e7e5']),
+   * at `level` 1–5: { move: 'g1f3', score } with the best line's score in
+   * centipawns for the side to move (mate as ±100000).
    */
   best(moves, level) {
     const run = async () => {
       await this.#start();
-      const { skill, ms, depth } = LEVELS[level - 1] ?? LEVELS[2];
+      const { skill = 20, pick, depth, ms } = LEVELS[level - 1] ?? LEVELS[2];
       await this.#send(`setoption name Skill Level value ${skill}`);
+      await this.#send(`setoption name MultiPV value ${pick ? PICK_FROM : 1}`);
       await this.#send(`position startpos${moves.length ? ` moves ${moves.join(' ')}` : ''}`);
-      let score = 0;
-      const line = await this.#send(`go movetime ${ms}${depth ? ` depth ${depth}` : ''}`, (l) => {
-        const m = / score (cp|mate) (-?\d+)/.exec(l);
-        if (m) score = m[1] === 'cp' ? Number(m[2]) : Math.sign(Number(m[2]) || -1) * 100000;
+      // The latest score and first move of each line (MultiPV numbers them from 1).
+      const lines = new Map();
+      const line = await this.#send(`go depth ${depth} movetime ${ms}`, (l) => {
+        const m = / multipv (\d+) score (cp|mate) (-?\d+).* pv (\S+)/.exec(l);
+        if (m) {
+          const score = m[2] === 'cp' ? Number(m[3]) : (Number(m[3]) > 0 ? MATE : -MATE);
+          lines.set(Number(m[1]), { move: m[4], score });
+        }
         return l.startsWith('bestmove');
       });
-      const move = line.split(' ')[1];
-      if (!move || move === '(none)') throw new Error('stockfish has no move');
-      return { move, score };
+      const best = line.split(' ')[1];
+      if (!best || best === '(none)') throw new Error('stockfish has no move');
+      const score = lines.get(1)?.score ?? 0;
+      if (pick && lines.size) return { move: weightedPick([...lines.values()], pick).move, score };
+      return { move: best, score };
     };
     const result = this.#queue.then(run);
     this.#queue = result.catch(() => {});

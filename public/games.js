@@ -271,10 +271,10 @@ export function createGames({ api, getTr, reconnect }) {
   const glyph = (type) => `${GLYPHS[type]}\uFE0E`;
   const square = (i) => FILES[i % 8] + (8 - Math.floor(i / 8));
 
+  // Unlike Vier gewinnt's column, the picked piece isn't sent: the TV mustn't give a move away.
   function pickSquare(tr, sq) {
     from = sq;
     promoting = null;
-    post('/api/party/point', { value: sq });
     renderPlay(tr);
   }
 

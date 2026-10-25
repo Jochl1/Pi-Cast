@@ -118,15 +118,14 @@ function chessPlay(p, sans) {
     p.game.state = chessRules.move(p.game.state, p.game.state.turn, { type: 'move', from, to, promotion });
   }
 }
-// Against pi·cast; Johann has tapped his knight on g5, so its moves show.
+// Against pi·cast, in the Italian game (Møller attack); material is even.
 const chessView = party((p) => {
-  const a = p.join(null, { name: 'Johann' }).token;
+  p.join(null, { name: 'Johann' });
   p.addBot(null);
   p.select(null, 'chess');
   p.start(null);
   chessPlay(p, ['e4', 'e5', 'Nf3', 'Nc6', 'Bc4', 'Bc5', 'c3', 'Nf6', 'd4', 'exd4', 'cxd4', 'Bb4+', 'Nc3', 'Nxe4', 'O-O', 'Bxc3',
     'd5', 'Bf6', 'Re1', 'Ne7', 'Rxe4', 'd6', 'Bg5', 'Bxg5', 'Nxg5', 'h6']);
-  p.point(a, 'g5');
 });
 // Two people; Lea (white this round) gives check and offers a draw.
 const chessCheckView = party((p) => {
@@ -138,6 +137,17 @@ const chessCheckView = party((p) => {
   chessPlay(p, ['d4', 'd5', 'c4', 'e6', 'Nc3', 'Nf6', 'Bg5', 'Bb4', 'cxd5', 'exd5', 'Qa4+']);
   p.game.state = chessRules.move(p.game.state, 1, { type: 'offer' });
   p.wins = { chess: { [id]: 1 } };
+});
+// The most taken pieces on a card (11) and a big lead.
+const chessMaterialView = party((p) => {
+  p.join(null, { name: 'Johann' });
+  p.join(null, { name: 'Sophie' });
+  p.select(null, 'chess');
+  p.start(null);
+  chessPlay(p, ['Nf3', 'b6', 'g3', 'Ba6', 'Nh4', 'Bb5', 'f4', 'h5', 'c3', 'Rh7', 'Bg2', 'c6', 'e4', 'Bc4', 'a3', 'Be6', 'b4', 'a5',
+    'bxa5', 'Rh8', 'axb6', 'Qxb6', 'Bb2', 'Qxb2', 'Bh3', 'Qxa3', 'e5', 'Qxa1', 'Bxe6', 'dxe6', 'Qe2', 'Kd7', 'Qd3+', 'Kc8', 'Ng2',
+    'Rh6', 'f5', 'exf5', 'Qxf5+', 'Kd8', 'Qd3+', 'Ke8', 'Rg1', 'Ra7', 'Qc4', 'Qxb1+', 'Ke2', 'Qxg1', 'Nh4', 'g6', 'g4', 'Bg7', 'gxh5',
+    'Qxh2+', 'Ng2', 'c5', 'Qb5+', 'Kd8', 'd3', 'Qxg2+', 'Ke1', 'Qh1+', 'Ke2', 'Qxh5+', 'Kf2', 'Ra8', 'Qxc5', 'Ra2+']);
 });
 const chessMateView = party((p) => {
   p.join(null, { name: 'Johann' });
@@ -275,6 +285,7 @@ export const scenes = {
     settings: { ...de, accent: 'mint' },
     layers: (t) => [gameScreens.games(t, chessCheckView, gamesQr), screens.toast(t, t.tr('gamesBackAgain'), null, { top: true })],
   },
+  'games-chess-material-en': { settings: base, layers: (t) => [gameScreens.games(t, chessMaterialView, gamesQr)] },
   'games-chess-mate': { settings: de, layers: (t) => [gameScreens.games(t, chessMateView, gamesQr)] },
   'games-eins-won': { settings: de, layers: (t) => [gameScreens.games(t, einsOverView, gamesQr)] },
 };

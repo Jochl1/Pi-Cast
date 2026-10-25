@@ -458,11 +458,11 @@ const CHESS_BOARD = { x: (1920 - 8 * CHESS_CELL) / 2, y: 150 };
 
 /**
  * The board, white at the bottom: the light squares are one rectangle and the
- * dark ones one shape (two bitmaps, not 64), the last move tinted amber, a king
- * in check red, and the square the player has tapped on their phone framed
- * white with its moves as dots (rings on captures).
+ * dark ones one shape (two bitmaps, not 64), the last move tinted amber and a
+ * king in check red. What a player taps on their phone stays on the phone, so
+ * the other side can't see a move coming.
  */
-function chessBoard(t, s, pointer, turn) {
+function chessBoard(t, s) {
   const { x: bx, y: by } = CHESS_BOARD;
   const S = CHESS_CELL;
   const { light, dark } = squareColors(t);
@@ -481,8 +481,6 @@ function chessBoard(t, s, pointer, turn) {
   ];
   for (const sq of s.last ?? []) ev.push(rect(...at(sq), S, S, { color: AMBER, opacity: 0.5 }));
   if (s.check) ev.push(rect(...at(s.check), S, S, { color: RED, opacity: 0.65 }));
-  const picked = turn != null && pointer?.seat === turn && typeof pointer.value === 'string' ? pointer.value : null;
-  if (picked) ev.push(rect(...at(picked), S, S, { color: '#FFFFFF', opacity: 0, border: 5, borderColor: '#FFFFFF' }));
 
   // Coordinates in the corners: ranks top left in the a-file, files bottom right on rank 1.
   for (let i = 0; i < 8; i++) {
@@ -494,12 +492,6 @@ function chessBoard(t, s, pointer, turn) {
   s.board.forEach((p, i) => {
     if (p) ev.push(piece(bx + (i % 8) * S + S / 2, by + Math.floor(i / 8) * S + S / 2, S * 0.8, p[0], p[1]));
   });
-  for (const to of picked ? s.legal[picked] ?? [] : []) {
-    const [x, y] = at(to);
-    const i = (8 - Number(to[1])) * 8 + (to.charCodeAt(0) - 97);
-    if (s.board[i]) ev.push(ring(x + S / 2, y + S / 2, S * 0.44, 6, ON_ACCENT, 0.35));
-    else ev.push(circle(x + S / 2, y + S / 2, 16, { color: ON_ACCENT, opacity: 0.32 }));
-  }
   return ev;
 }
 
@@ -515,8 +507,21 @@ function chessPlayer(t, view, p, seat, y, h) {
   ev.push(text(nameOf(t, p, 40, 200), { x: x + 172, y: y + 76, an: 4, px: 40, weight: 600, color: t.text }));
   ev.push(piece(x + 188, y + 124, 34, color, 'k'));
   ev.push(text(escape(t.tr(color === 'w' ? 'chessWhite' : 'chessBlack')), { x: x + 214, y: y + 124, an: 4, px: 28, color: t.muted }));
+  // What they've taken, in the other colour, the same kinds bunched; then how far ahead they are.
+  const taken = s.material[color];
+  const lead = color === 'w' ? s.material.lead : -s.material.lead;
+  // The pieces overlap more as the list grows, so all 15 still fit the card with the lead.
+  const kinds = new Set(taken).size;
+  const step = Math.min(24, (w - 80 - 70 - Math.max(0, kinds - 1) * 16) / Math.max(1, taken.length));
+  let cx = x + 40 + 20;
+  taken.forEach((type, i) => {
+    if (i && type !== taken[i - 1]) cx += 16;
+    ev.push(piece(cx, y + 190, 40, color === 'w' ? 'b' : 'w', type));
+    cx += step;
+  });
+  if (lead > 0) ev.push(text(`+${lead}`, { x: cx + (taken.length ? 18 : -20), y: y + 190, an: 4, px: 30, weight: 600, color: t.text }));
   if (s.offer === seat) {
-    ev.push(text(`{${paint(AMBER)}}● {${paint(t.text)}}${escape(t.tr('chessOffers'))}`, { x: x + 40, y: y + 196, an: 4, px: 28, weight: 500 }));
+    ev.push(text(`{${paint(AMBER)}}● {${paint(t.text)}}${escape(t.tr('chessOffers'))}`, { x: x + 40, y: y + 236, an: 4, px: 28, weight: 500 }));
   }
   const by = y + h - 64;
   if (turn && p.bot) ev.push(text(escape(t.tr('gamesThinking')), { x: x + 40, y: by, an: 4, px: 28, color: t.muted }));
@@ -530,17 +535,45 @@ function chessPlayer(t, view, p, seat, y, h) {
   return ev;
 }
 
-/** "ZÜGE": the moves in German notation, numbered in pairs, the newest at the bottom in the accent. */
-function chessMoves(t, sans, y, h) {
+/** Splits "Italian Game: Classical Variation, Greco Gambit" into lines of about `max` characters. */
+function wrap(s, max) {
+  const lines = [];
+  for (const word of s.split(' ')) {
+    const lastLine = lines.at(-1);
+    if (lastLine != null && (lastLine + ' ' + word).length <= max) lines[lines.length - 1] = `${lastLine} ${word}`;
+    else lines.push(word);
+  }
+  return lines;
+}
+
+/**
+ * "ZÜGE": the moves in German notation, numbered in pairs, the newest at the
+ * bottom in the accent. Above them "ERÖFFNUNG": the opening ("Italian Game")
+ * and its variation below, muted, in up to two lines (cut with … beyond).
+ */
+function chessMoves(t, s, y, h) {
+  const { sans, opening } = s;
   const x = W - PAD_X - 404;
   const ev = [rect(x, y, 404, h, { color: '#FFFFFF', opacity: 0.055, radius: 36 })];
-  ev.push(smallLabel(t, t.tr('chessMoves'), x + 40, y + 34));
+  let top = y + 34;
+  ev.push(smallLabel(t, t.tr('chessOpening'), x + 40, top));
+  const [family, variation = ''] = (opening?.name ?? '–').split(': ');
+  ev.push(text(escape(fit(family, 30, 324)), { x: x + 40, y: top + 44, an: 7, px: 30, weight: 600, color: t.text }));
+  const all = wrap(variation, 26);
+  const lines = all.slice(0, 2);
+  if (all.length > 2) lines[1] = fit(`${lines[1]} …`, 24, 324);
+  lines.forEach((l, i) => ev.push(text(escape(l), { x: x + 40, y: top + 90 + i * 32, an: 7, px: 24, color: t.muted })));
+  top += 90 + lines.length * 32 + 30;
+  ev.push(rect(x + 40, top - 14, 324, 2, { color: '#FFFFFF', opacity: 0.1 }));
+  top += 16;
+  ev.push(smallLabel(t, t.tr('chessMoves'), x + 40, top));
   const rowH = 46;
-  const maxRows = Math.floor((h - 120) / rowH);
+  const listTop = top + 70;
+  const maxRows = Math.floor((y + h - 30 - listTop) / rowH);
   const pairs = Math.ceil(sans.length / 2);
   const first = Math.max(0, pairs - maxRows);
   for (let n = first; n < pairs; n++) {
-    const ry = y + 104 + (n - first) * rowH;
+    const ry = listTop + (n - first) * rowH;
     ev.push(text(`${n + 1}.`, { x: x + 92, y: ry, an: 9, px: 28, font: 'JetBrains Mono', color: t.muted }));
     for (const k of [0, 1]) {
       const i = 2 * n + k;
@@ -565,7 +598,7 @@ function chess(t, view) {
     smallLabel(t, t.tr('game_chess'), PAD_X, PAD_Y - 20),
     text(bot ? `pi${span('·', t.accent)}${span(`cast · ${escape(t.tr('chessLevel', { n: bot.bot }))}`, t.muted)}`
       : escape(t.tr('gamesRound', { n: g.round + 1 })), { x: W - PAD_X, y: PAD_Y - 20, an: 9, px: 28, color: t.muted }),
-    ...chessBoard(t, s, g.pointer, g.turn),
+    ...chessBoard(t, s),
   ];
   // Black's player at the top, white's at the bottom, like the board.
   const cardH = 340;
@@ -577,7 +610,7 @@ function chess(t, view) {
     ev.push(rect(PAD_X + 202 - 90, by + size / 2 - 28, 180, 56, { color: RED, radius: 28 }));
     ev.push(text(escape(label), { x: PAD_X + 202, y: by + size / 2, an: 5, px: 24, weight: 700, spacing: 3, color: '#FFFFFF' }));
   }
-  ev.push(...chessMoves(t, s.sans, by, size));
+  ev.push(...chessMoves(t, s, by, size));
 
   if (s.over) {
     const msg = s.winner != null ? t.tr('gamesWinner', { name: players[s.winner].name }) : t.tr('chessDraw');

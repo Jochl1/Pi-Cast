@@ -1,5 +1,5 @@
+import fs from 'node:fs';
 import { Chess } from 'chess.js';
-import { mistakeChance } from './levels.js';
 import stockfish from './stockfish.js';
 
 const VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
@@ -12,6 +12,28 @@ function replay(moves) {
 }
 
 const uci = (m) => m.from + m.to + (m.promotion ?? '');
+
+const START = { q: 1, r: 2, b: 2, n: 2, p: 8 };
+
+/**
+ * What each side has taken, most valuable first ({ w: ['q', 'p'], b: [...] }:
+ * w is what white took), and `lead`, white's material minus black's (a
+ * promotion counts as the new piece, so this can differ from the captures).
+ */
+function material(board) {
+  const count = { w: {}, b: {} };
+  for (const p of board) if (p) count[p[0]][p[1]] = (count[p[0]][p[1]] ?? 0) + 1;
+  const taken = (from) => Object.keys(START).flatMap((type) => Array(Math.max(0, START[type] - (count[from][type] ?? 0))).fill(type));
+  const worth = (c) => Object.entries(count[c]).reduce((sum, [type, n]) => sum + VALUE[type] * n, 0);
+  return { w: taken('b'), b: taken('w'), lead: worth('w') - worth('b') };
+}
+
+// The opening names by position (scripts/build-openings.js), read on first use.
+let openingNames = null;
+const openings = () => {
+  openingNames ??= JSON.parse(fs.readFileSync(new URL('./openings.json', import.meta.url), 'utf8'));
+  return openingNames;
+};
 
 /** How the game stands after the last move: a result reason, or null if it goes on. */
 function ending(game) {
@@ -113,11 +135,21 @@ export default {
 
   /**
    * The board (64 squares from a8 to h1, e.g. 'wk' or null), the last move,
-   * the king in check, and the legal moves of the side to move by square.
+   * the king in check, the legal moves of the side to move by square, the
+   * material and the opening.
    */
   public(s) {
     const game = replay(s.moves);
     const board = game.board().flat().map((sq) => (sq ? sq.color + sq.type : null));
+    // The newest position in the moves that has a name (none after the book ends: the last one stays).
+    let opening = null;
+    for (const m of game.history({ verbose: true }).reverse()) {
+      const name = openings()[m.after.split(' ').slice(0, 4).join(' ')];
+      if (name) {
+        opening = { eco: name.slice(0, 3), name: name.slice(4) };
+        break;
+      }
+    }
     const last = s.moves.at(-1);
     const legal = {};
     if (!s.over) for (const m of game.moves({ verbose: true })) (legal[m.from] ??= []).includes(m.to) || legal[m.from].push(m.to);
@@ -125,7 +157,7 @@ export default {
     if (game.inCheck()) check = game.findPiece({ type: 'k', color: game.turn() })[0];
     return {
       board, sans: s.sans, white: s.white, turn: s.turn, toMove: game.turn(),
-      last: last ? [last.slice(0, 2), last.slice(2, 4)] : null, check, legal,
+      last: last ? [last.slice(0, 2), last.slice(2, 4)] : null, check, legal, material: material(board), opening,
       offer: s.offer, declined: s.declined, over: s.over, winner: s.winner, result: s.result, resigned: s.resigned ?? null,
     };
   },
@@ -145,11 +177,6 @@ export default {
     if (s.offer === 1 - seat) {
       const accept = score <= -150 || (Math.abs(score) <= 30 && s.moves.length >= 60);
       if (accept) return { type: 'accept' };
-    }
-    // The lower levels also slip now and then.
-    if (Math.random() < mistakeChance(level) / 2) {
-      const all = game.moves({ verbose: true });
-      pick = all[Math.floor(Math.random() * all.length)];
     }
     return { type: 'move', from: pick.from, to: pick.to, promotion: pick.promotion };
   },
