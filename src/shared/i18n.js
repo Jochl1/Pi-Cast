@@ -18,7 +18,6 @@ const STRINGS = {
     offline: 'Offline',
     // TV: home weather and key hints
     homeInstagram: 'Instagram',
-    homeGames: 'Spiele',
     homeGames: 'Games',
     wifi: 'Wi-Fi',
     wx_clear: 'Clear',
@@ -251,6 +250,7 @@ const STRINGS = {
     ethernet: 'LAN',
     offline: 'Offline',
     homeInstagram: 'Instagram',
+    homeGames: 'Spiele',
     wifi: 'WLAN',
     wx_clear: 'Klar',
     wx_partly: 'Teils bewölkt',
