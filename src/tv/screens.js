@@ -466,16 +466,36 @@ export function settingsPanel(t, {
 }
 
 /** Short message at the bottom centre, e.g. playback errors; `dot` = color of a leading dot. */
-export function toast(t, message, dot = null, { top = false } = {}) {
-  const label = escape(fit(message, 39, 1400));
+// The gap between the home screen's clock and weather, for toasts at the top.
+const TOAST_NARROW = 840;
+
+/** `message` split at the space that best balances two lines; the second is cut to `max` if needed. */
+function twoLines(message, max, width) {
+  const words = message.split(' ');
+  let best = null;
+  for (let i = 1; i < words.length; i++) {
+    const a = words.slice(0, i).join(' ');
+    const b = words.slice(i).join(' ');
+    const worst = Math.max(width(a), width(b));
+    if (width(a) <= max && (!best || worst < best.worst)) best = { a, b, worst };
+  }
+  if (!best) return [fit(message, 39, max)];
+  return [best.a, fit(best.b, 39, max)];
+}
+
+export function toast(t, message, dot = null, { top = false, narrow = false } = {}) {
   const lead = dot ? 24 + 24 : 0;
-  const w = textWidth(label, 39, 0.56) + 108 + lead;
-  const h = 114;
+  const width = (s) => measure(s, 39) ?? textWidth(s, 39, 0.56);
+  // `narrow`: between the home screen's clock and weather, in up to two lines.
+  let lines = [fit(message, 39, 1400)];
+  if (narrow && width(message) > TOAST_NARROW - 108 - lead) lines = twoLines(message, TOAST_NARROW - 108 - lead, width);
+  const w = Math.max(...lines.map(width)) + 108 + lead;
+  const h = 114 + (lines.length - 1) * 50;
   const x = W / 2 - w / 2;
   const y = top ? 24 : H - 120 - h;
   const events = [
-    rect(x, y, w, h, { color: t.glass, radius: Math.min(t.pill * 3, h / 2), border: 3, borderColor: t.line }),
-    text(label, { x: W / 2 + lead / 2, y: y + h / 2, an: 5, px: 39, color: t.text }),
+    rect(x, y, w, h, { color: t.glass, radius: Math.min(t.pill * 3, 57), border: 3, borderColor: t.line }),
+    text(lines.map(escape).join('\\N'), { x: W / 2 + lead / 2, y: y + h / 2, an: 5, px: 39, color: t.text }),
   ];
   if (dot) events.push(circle(x + 54 + 12, y + h / 2, 12, { color: dot }));
   return events;

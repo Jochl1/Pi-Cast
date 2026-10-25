@@ -399,8 +399,11 @@ export default class Tv {
         })),
       });
     }
-    // On game night the board fills the bottom, and the timeline sits there, so toasts go to the top.
-    if (this.message) layers.toast = screens.toast(t, this.message.text, this.message.dot, { top: screen === 'games' || timeline });
+    // The home screen's key hints, game night's boards and the timeline fill the bottom, so toasts go to the top there
+    // (not over the settings panel's title).
+    if (this.message) layers.toast = screens.toast(t, this.message.text, this.message.dot, {
+      top: (onHome && !this.panel.open) || screen === 'games' || timeline, narrow: onHome && !this.panel.open,
+    });
 
     for (const [name, events] of Object.entries(layers)) {
       await this.#send(name, events ? events.join('\n') : null);

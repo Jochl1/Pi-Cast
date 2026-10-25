@@ -226,6 +226,14 @@ export const scenes = {
     }), screens.toast(t, toastText)],
   },
   // German: the longest texts.
+  'home-de+toast-top': {
+    settings: de,
+    layers: (t) => [screens.home(t, homeState), screens.toast(t, t.tr('reelsLoggedOut'), null, { top: true, narrow: true })],
+  },
+  'home+key-toast-top': {
+    settings: base,
+    layers: (t) => [screens.home(t, homeState), screens.toast(t, 'Trymacs', '#FF5D5D', { top: true, narrow: true })],
+  },
   'home-de': { settings: de, layers: (t) => [screens.home(t, homeState)] },
   'loading-de': {
     settings: de,
