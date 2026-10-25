@@ -273,9 +273,9 @@ async function endSplash() {
 }
 await endSplash();
 // Splash, then the startup sound, then the home screen.
-const startedAt = Date.now();
+const startedAt = performance.now(); // the wall clock jumps when NTP syncs during boot
 playback.once('backdrop', () => {
-  log.info(`home screen up ${((Date.now() - startedAt) / 1000).toFixed(1)} s after the splash`);
+  log.info(`home screen up ${((performance.now() - startedAt) / 1000).toFixed(1)} s after the splash`);
   sounds.booted();
 });
 // Doesn't wait for mpv: it retries in the background if it can't start.
