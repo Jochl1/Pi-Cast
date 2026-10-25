@@ -124,7 +124,7 @@ Node 22 (ESM), with `express`, `yt-cast-receiver` and `qrcode` as the only depen
 
 - yt-dlp comes from `.venv` (`yt-dlp[default]`, which includes `yt-dlp-ejs`).
 - Format (`ytdlFormat` in `config.js`, also passed to mpv): H.264 (avc1) at 1080p30 or lower, with AAC audio. VP9 and AV1 can't be hardware-decoded on a Pi 3.
-  - YouTube live streams only have separate video and audio, and the audio's codec is reported as unknown, so the last choice takes any audio with the H.264 video (the AAC-only choices failed with "Requested format is not available").
+  - YouTube live streams only have separate video and audio, and the audio's codec isn't reported (yt-dlp shows "unknown"; it's AAC), so the last choice takes any audio with the H.264 video (the AAC-only choices failed with "Requested format is not available"). `ytdl.py` takes the audio as whichever requested format isn't the video; filtering on a set `acodec` dropped it.
 - yt-dlp needs a JS runtime for YouTube's challenges: `js-runtimes=node`. Node ≥ 22 from NodeSource only exists for arm64, so the Pi must run the **64-bit** OS.
 - **The yt-dlp worker** (`src/ytdl.js` and `bin/ytdl.py worker`) is a Python process that stays running and resolves YouTube links to direct stream URLs.
   - Playback stops the old video, asks the worker, and loads an `edl://` that joins the video and audio streams, with yt-dlp's HTTP headers.

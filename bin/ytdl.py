@@ -58,7 +58,8 @@ def resolve(ydl, url):
         raise ValueError('playlists are not supported')
     formats = info.get('requested_formats') or [info]
     video = next((f for f in formats if f.get('vcodec') not in (None, 'none')), formats[0])
-    audio = next((f for f in formats if f is not video and f.get('acodec') not in (None, 'none')), None)
+    # Not `acodec` set: live streams' audio has none (yt-dlp's "unknown").
+    audio = next((f for f in formats if f is not video and f.get('acodec') != 'none'), None)
     return {
         'title': info.get('title'),
         'duration': info.get('duration'),
