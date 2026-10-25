@@ -311,6 +311,38 @@ input[type="range"] { flex-grow: 1; accent-color: var(--accent); height: 28px; }
 }
 .mark-x::after { transform: rotate(-45deg); }
 
+/* Eins! */
+.board-eins { display: flex; flex-direction: column; gap: 12px; }
+.e-others { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; color: var(--muted); }
+.e-others span { padding: 5px 10px; border-radius: var(--pill); background: var(--surface); }
+.e-others span.turn { box-shadow: inset 0 0 0 2px var(--accent); color: var(--text); }
+.e-others b { color: var(--text); }
+.e-table { display: flex; align-items: center; gap: 14px; padding: 12px; border-radius: var(--radius); background: var(--surface); }
+.e-top { font-weight: 600; }
+.e-color { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 13px; color: var(--muted); }
+.e-pending { color: #FF5D5D; font-size: 15px; }
+.e-hand { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; padding-top: 10px; }
+.ecard {
+  position: relative; width: 60px; height: 88px; flex: none; border: 0; border-radius: 10px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: #FFFFFF; font-size: 28px; font-weight: 700; box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.35);
+  transition: transform 0.12s;
+}
+.ecard small { position: absolute; top: 5px; left: 7px; font-size: 11px; }
+.ecard.wild { background: conic-gradient(#FF5D5D 0 25%, #FFC247 0 50%, #4BE3B0 0 75%, #6FA8FF 0); text-shadow: 0 1px 4px #0008; }
+.ecard:disabled { opacity: 1; cursor: default; }
+.ecard.no { opacity: 0.35; }
+.e-hand .ecard:not(.no):not(:disabled) { transform: translateY(-6px); }
+.e-hand .ecard.pick { outline: 3px solid var(--text); outline-offset: 3px; transform: translateY(-10px); }
+.e-colors { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.e-colors .hint { margin-right: 4px; }
+.board-eins .row { display: flex; gap: 10px; }
+.board-eins .row > * { flex: 1; }
+.eins-btn { color: #FF5D5D; letter-spacing: 0.08em; }
+.eins-btn.armed { background: #FF5D5D; color: #FFFFFF; }
+.g-score { flex-wrap: wrap; }
+.g-score .score { flex: 1 1 40%; }
+
 /* --- Toast --- */
 .toast {
   position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 20px); transform: translateX(-50%);

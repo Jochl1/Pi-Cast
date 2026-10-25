@@ -61,6 +61,17 @@ const icons = {
     ev.push(circle(x + c * 1.5, y + c * 0.05, rad, { color: ICON_COLORS.a }));
     return ev;
   },
+  eins(t, x, y, s) {
+    const w = s * 0.42;
+    const h = s * 0.62;
+    const bx = x + s / 2 - w / 2;
+    const by = y + s * 0.2;
+    return [
+      ...card(t, bx, by, w, h, { color: 'b', value: '7' }, 16),
+      ...card(t, bx, by, w, h, { color: 'y', value: '3' }, -16),
+      ...card(t, bx, by, w, h, { color: 'r', value: '1' }, 0),
+    ];
+  },
   tictactoe(t, x, y, s) {
     const c = s / 3;
     const th = s * 0.035;
@@ -270,7 +281,125 @@ function tictactoe(t, view) {
   return ev;
 }
 
-const BOARDS = { connect4, tictactoe };
+// --- Eins! ---
+
+export const CARD_COLORS = { r: '#FF5D5D', y: '#FFC247', g: '#4BE3B0', b: '#6FA8FF' };
+const SYMBOL = { skip: '⊘', rev: '⇄' };
+/** What's printed on a card: the number, +2/+4, or a symbol (DejaVu has them, Sora doesn't). */
+const face = (value) => (value === 'wild' ? '' : SYMBOL[value] ?? value);
+
+/** Wraps an event in a rotation of `deg` around (ox, oy). */
+const turned = (event, deg, ox, oy) => (deg ? event.replace('{', `{\\org(${ox},${oy})\\frz${deg}`) : event);
+
+/** One card, w×h at (x, y), turned by `deg` around its centre. Wilds are dark with the four colours. */
+function card(t, x, y, w, h, c, deg = 0) {
+  const ox = x + w / 2;
+  const oy = y + h / 2;
+  const r = w * 0.12;
+  const wild = c.color == null;
+  const ev = [
+    rect(x, y, w, h, { color: wild ? '#1B1834' : CARD_COLORS[c.color], radius: r }),
+    rect(x + w * 0.07, y + w * 0.07, w * 0.86, h - w * 0.14, {
+      color: '#000000', opacity: 0, radius: r * 0.6, border: Math.max(2, w * 0.012), borderColor: '#FFFFFF', borderOpacity: 0.5,
+    }),
+  ];
+  if (wild) {
+    const q = w * 0.16;
+    ['r', 'y', 'g', 'b'].forEach((k, i) => {
+      ev.push(circle(ox + (i % 2 ? q : -q) * 0.9, oy + (i < 2 ? -q : q) * 0.9, q, { color: CARD_COLORS[k] }));
+    });
+  }
+  const label = face(c.value);
+  const font = SYMBOL[c.value] ? 'DejaVu Sans' : 'Sora';
+  if (label) {
+    // A wild's middle is its four colours; the value goes in the corner only.
+    if (!wild) ev.push(text(escape(label), { x: ox, y: oy + 2, an: 5, px: w * (label.length > 1 ? 0.36 : 0.5), weight: 700, font, color: '#FFFFFF' }));
+    ev.push(text(escape(label), { x: x + w * 0.15, y: y + w * 0.12, an: 7, px: w * 0.15, weight: 700, font, color: '#FFFFFF' }));
+  }
+  return ev.map((e) => turned(e, deg, ox, oy));
+}
+
+function cardBack(t, x, y, w, h) {
+  return [
+    rect(x, y, w, h, { color: '#1B1834', radius: w * 0.12, border: 3, borderColor: t.accent, borderOpacity: 0.7 }),
+    text(`Eins${span('!', t.accent)}`, { x: x + w / 2, y: y + h / 2, an: 5, px: w * 0.24, weight: 700, color: t.text }),
+  ];
+}
+
+/** "Blau 7", "Rot +2", "+4": a card's name for the TV's log line. */
+export function cardName(tr, c) {
+  const value = { skip: tr('einsSkip'), rev: tr('einsReverse'), wild: tr('einsWild') }[c.value] ?? c.value;
+  return c.color ? `${tr(`einsColor_${c.color}`)} ${value}` : value;
+}
+
+function eins(t, view) {
+  const g = view.game;
+  const s = g.state;
+  const players = seated(view);
+  const ev = [
+    smallLabel(t, t.tr('game_eins'), PAD_X, PAD_Y - 20),
+    text(escape(t.tr('einsDeck', { n: s.deck })), { x: W - PAD_X, y: PAD_Y - 20, an: 9, px: 28, color: t.muted }),
+  ];
+
+  // The players across the top; the one whose turn it is framed.
+  const n = players.length;
+  const gap = 24;
+  const pw = Math.min(300, (W - 2 * PAD_X - (n - 1) * gap) / n);
+  const px0 = (W - (n * pw + (n - 1) * gap)) / 2;
+  const py = 170;
+  players.forEach((p, i) => {
+    const x = px0 + i * (pw + gap);
+    const turn = g.turn === i;
+    ev.push(rect(x, py, pw, 140, turn
+      ? { color: '#FFFFFF', opacity: 0.10, radius: 70, border: 4, borderColor: t.accent }
+      : { color: '#FFFFFF', opacity: 0.055, radius: 70, border: 2, borderColor: '#FFFFFF', borderOpacity: 0.16 }));
+    ev.push(...avatar(t, x + 70, py + 70, 46, p));
+    ev.push(text(nameOf(t, p, 34, pw - 150), { x: x + 134, y: py + 50, an: 4, px: 34, weight: 600, color: t.text }));
+    const sub = turn && p.bot && !s.over ? t.tr('gamesThinking') : t.tr(s.counts[i] === 1 ? 'einsOneCard' : 'einsCards', { n: s.counts[i] });
+    ev.push(text(escape(sub), { x: x + 134, y: py + 94, an: 4, px: 26, color: t.muted }));
+    if (s.counts[i] === 1 && s.called[i]) {
+      ev.push(rect(x + pw - 110, py - 22, 120, 48, { color: CARD_COLORS.r, radius: 24 }));
+      ev.push(text('EINS!', { x: x + pw - 50, y: py + 2, an: 5, px: 22, weight: 700, spacing: 2, color: '#FFFFFF' }));
+    }
+  });
+  ev.push(text(`{${paint(t.muted)}}${escape(t.tr('einsDirection'))} ${s.dir > 0 ? '→' : '←'}`, { x: W - PAD_X, y: py + 190, an: 9, px: 26, weight: 500 }));
+
+  // The table: the draw pile, the pile's top two cards, the colour and an open stack.
+  const cw = 230;
+  const ch = 340;
+  const cy = 410;
+  ev.push(...cardBack(t, W / 2 - cw - 80, cy + 10, cw, ch), ...cardBack(t, W / 2 - cw - 70, cy, cw, ch));
+  const tilt = (c) => ((c.id * 7) % 13) - 6; // each card lies a little differently, but always the same
+  const [under, topCard] = s.pile.length > 1 ? s.pile : [null, s.pile[0]];
+  if (under) ev.push(...card(t, W / 2 + 60, cy + 6, cw, ch, under, tilt(under)));
+  ev.push(...card(t, W / 2 + 70, cy, cw, ch, topCard, tilt(topCard)));
+  const dx = W / 2 + 70 + cw + 130;
+  ev.push(circle(dx, cy + 120, 36, { color: CARD_COLORS[s.color] }));
+  ev.push(text(escape(t.tr(`einsColor_${s.color}`).toLocaleUpperCase(t.tr.locale)), { x: dx, y: cy + 184, an: 8, px: 22, weight: 600, spacing: 3, color: t.muted }));
+  if (s.pending) ev.push(text(`+${s.pending}`, { x: dx, y: cy + 290, an: 5, px: 72, weight: 700, color: CARD_COLORS.r }));
+
+  if (s.over) {
+    ev.push(...result(t, view, players, cy + ch + 40));
+    return ev;
+  }
+  // What just happened, and whose turn it is.
+  const l = s.last;
+  const who = (seat) => players[seat].name;
+  let line = '';
+  if (l?.type === 'play') {
+    line = t.tr('einsPlays', { name: who(l.seat), card: `{${paint(l.card.color ? CARD_COLORS[l.card.color] : t.text)}}${escape(cardName(t.tr, l.card))}{${paint(t.muted)}}` });
+    if (l.card.color == null) line += ` → {${paint(CARD_COLORS[l.color])}}${escape(t.tr(`einsColor_${l.color}`))}{${paint(t.muted)}}`;
+    if (l.penalty) line += ` · ${escape(t.tr('einsForgot'))}`;
+  } else if (l?.type === 'draw') {
+    line = escape(t.tr(l.n === 1 ? 'einsDrawsOne' : 'einsDraws', { name: who(l.seat), n: l.n }));
+  }
+  const turnText = `{${paint(t.text)}}${escape(t.tr('gamesTheirTurn', { name: who(g.turn) }))}`;
+  ev.push(text([line, turnText].filter(Boolean).join(` {${paint(t.muted)}}· `), { x: W / 2, y: cy + ch + 90, an: 5, px: 34, color: t.muted }));
+  ev.push(hints(t, [[t.tr('keyBack'), t.tr('gamesEnd')]]));
+  return ev;
+}
+
+const BOARDS = { connect4, tictactoe, eins };
 
 /** The game night screen: the lobby, or the game being played. */
 export function games(t, view, qr) {

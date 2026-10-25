@@ -37,6 +37,9 @@ export function createGames({ api, getTr, reconnect }) {
   let view = null;
   let pickedColor = null;
   let column = null; // Vier gewinnt: the column tapped, before "Drop"
+  let picked = null; // Eins!: the card tapped, and the colour for a wild
+  let wildColor = null;
+  let einsArmed = false; // Eins!: "EINS!" pressed, sent with the next card
 
   const post = (path, body) => api('POST', path, body).catch(() => {});
 
@@ -149,6 +152,8 @@ export function createGames({ api, getTr, reconnect }) {
       }, c == null ? null : el('span', { class: c === 0 ? 'mark-x' : 'mark-o', style: { '--c': players[c].color } }))));
       $('g-hint').textContent = mine ? tr('gamesTttHint') : '';
       $('g-act').hidden = true;
+    } else if (g.id === 'eins') {
+      renderEins(tr, g, players, seat, mine);
     }
 
     const wins = view.wins[g.id] ?? {};
@@ -158,6 +163,94 @@ export function createGames({ api, getTr, reconnect }) {
     $('g-again').textContent = tr('gamesAgain');
     $('g-end').hidden = !view.me.host;
     $('g-end').textContent = tr(s.over ? 'gamesBackToLobby' : 'gamesEnd');
+  }
+
+  // --- Eins! ---
+
+  const CARD_COLORS = { r: '#FF5D5D', y: '#FFC247', g: '#4BE3B0', b: '#6FA8FF' };
+  const SYMBOL = { skip: '⊘', rev: '⇄', wild: '' };
+  const ORDER = ['r', 'y', 'g', 'b', null];
+  const VALUES = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'skip', 'rev', '+2', 'wild', '+4'];
+  const cardName = (tr, c) => {
+    const value = { skip: tr('einsSkip'), rev: tr('einsReverse'), wild: tr('einsWild') }[c.value] ?? c.value;
+    return c.color ? `${tr(`einsColor_${c.color}`)} ${value}` : value;
+  };
+  function cardEl(c, props = {}) {
+    const label = SYMBOL[c.value] ?? c.value;
+    return el('button', {
+      type: 'button', class: `ecard${c.color ? '' : ' wild'}`, style: c.color ? { background: CARD_COLORS[c.color] } : {}, ...props,
+    }, el('small', {}, label), label);
+  }
+
+  function renderEins(tr, g, players, seat, mine) {
+    const s = g.state;
+    const hand = [...(view.mine?.hand ?? [])].sort((a, b) => ORDER.indexOf(a.color) - ORDER.indexOf(b.color)
+      || VALUES.indexOf(a.value) - VALUES.indexOf(b.value));
+    const ok = new Set(view.mine?.playable ?? []);
+    if (!mine || !ok.has(picked)) { picked = null; wildColor = null; }
+    if (!mine || hand.length !== 2) einsArmed = false;
+    const card = hand.find((c) => c.id === picked);
+    const topCard = s.pile[s.pile.length - 1];
+
+    const others = el('div', { class: 'e-others' }, ...players.map((p, i) => (i === seat ? null : el('span', {
+      class: g.turn === i ? 'turn' : '',
+    }, p.name, ' ', el('b', {}, String(s.counts[i])), s.counts[i] === 1 && s.called[i] ? ' · EINS!' : ''))));
+    const table = el('div', { class: 'e-table' },
+      cardEl(topCard, { disabled: true, tabindex: '-1' }),
+      el('div', {},
+        el('div', { class: 'e-top' }, tr('einsOnPile', { card: cardName(tr, topCard) })),
+        el('div', { class: 'e-color' }, el('span', { class: 'dot', style: { background: CARD_COLORS[s.color] } }), tr(`einsColor_${s.color}`),
+          s.pending ? el('b', { class: 'e-pending' }, ` +${s.pending}`) : null)));
+    const handEl = el('div', { class: 'e-hand' }, ...hand.map((c) => cardEl(c, {
+      class: `ecard${c.color ? '' : ' wild'}${mine && !ok.has(c.id) ? ' no' : ''}${c.id === picked ? ' pick' : ''}`,
+      disabled: !mine || !ok.has(c.id),
+      onclick: () => {
+        picked = c.id;
+        if (c.color) wildColor = null;
+        renderPlay(tr);
+      },
+    })));
+    const colors = card && !card.color ? el('div', { class: 'e-colors' },
+      el('span', { class: 'hint' }, tr('einsPickColor')),
+      ...Object.entries(CARD_COLORS).map(([k, hex]) => el('button', {
+        type: 'button', class: 'swatch', style: { background: hex }, 'aria-pressed': String(wildColor === k),
+        'aria-label': tr(`einsColor_${k}`),
+        onclick: () => { wildColor = k; renderPlay(tr); },
+      }))) : null;
+    let playLabel = tr('einsPickCard');
+    if (card) playLabel = tr('einsPlay', { card: card.color || !wildColor ? cardName(tr, card) : `${cardName(tr, card)} → ${tr(`einsColor_${wildColor}`)}` });
+    const play = el('button', {
+      type: 'button', class: 'accent-btn wide', disabled: !card || (!card.color && !wildColor),
+      onclick: () => {
+        const action = { type: 'play', card: card.id, color: wildColor ?? undefined, eins: einsArmed };
+        picked = null;
+        wildColor = null;
+        einsArmed = false;
+        post('/api/party/move', { action });
+      },
+    }, playLabel);
+    const buttons = el('div', { class: 'row' },
+      el('button', {
+        type: 'button', class: 'ghost-btn', disabled: !mine,
+        onclick: () => {
+          picked = null;
+          post('/api/party/move', { action: { type: 'draw' } });
+        },
+      }, s.pending ? tr('einsDrawN', { n: s.pending }) : tr('einsDraw')),
+      el('button', {
+        type: 'button', class: `ghost-btn eins-btn${einsArmed ? ' armed' : ''}`, disabled: !mine || hand.length !== 2,
+        onclick: () => { einsArmed = !einsArmed; renderPlay(tr); },
+      }, einsArmed ? tr('einsCalled') : tr('einsCall')));
+
+    const board = $('g-board');
+    board.className = 'board-eins';
+    board.replaceChildren(others, table, el('h2', { class: 'section-label' }, tr('einsYourCards', { n: hand.length })), handEl,
+      ...(s.over || seat < 0 ? [] : [colors, mine ? play : null, buttons].filter(Boolean)));
+    let hint = '';
+    if (mine && s.pending) hint = tr('einsMustStack', { n: s.pending });
+    else if (mine && hand.length === 2 && !einsArmed) hint = tr('einsCallHint');
+    $('g-hint').textContent = hint;
+    $('g-act').hidden = true;
   }
 
   // --- Buttons that don't change ---

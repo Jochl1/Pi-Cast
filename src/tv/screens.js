@@ -184,7 +184,8 @@ const LIVE_RED = '#FF4D5E';
 /**
  * A row above the divider: the colour keys' favourites on the left
  * (`keys` = [{ hex, name, live }]; a live Twitch channel gets a red "LIVE"
- * pill and a brighter name), and "▲ Instagram" on the right while logged in.
+ * pill and a brighter name), and on the right "▲ Instagram" (while logged
+ * in) and "▼ Games".
  * Names are measured in the font, so the pills never overlap them.
  */
 function keyHints(t, keys, instagram) {
@@ -209,11 +210,11 @@ function keyHints(t, keys, instagram) {
     }
     x += 48;
   }
-  if (instagram) {
-    events.push(
-      text(`▲ {${paint(t.muted)}}${escape(t.tr('homeInstagram'))}`, { x: W - PAD_X, y, an: 6, px: 30, weight: 600, color: t.text }),
-    );
-  }
+  // On the right: what ▲ and ▼ open.
+  const opens = [instagram && ['▲', t.tr('homeInstagram')], ['▼', t.tr('homeGames')]].filter(Boolean);
+  events.push(text(opens.map(([k, label]) => `{${paint(t.text)}}${k} {${paint(t.muted)}}${escape(label)}`).join('      '), {
+    x: W - PAD_X, y, an: 6, px: 30, weight: 600, color: t.text,
+  }));
   return events;
 }
 
@@ -444,7 +445,7 @@ export function toast(t, message, dot = null, { top = false } = {}) {
   const w = textWidth(label, 39, 0.56) + 108 + lead;
   const h = 114;
   const x = W / 2 - w / 2;
-  const y = top ? 36 : H - 120 - h;
+  const y = top ? 24 : H - 120 - h;
   const events = [
     rect(x, y, w, h, { color: t.glass, radius: Math.min(t.pill * 3, h / 2), border: 3, borderColor: t.line }),
     text(label, { x: W / 2 + lead / 2, y: y + h / 2, an: 5, px: 39, color: t.text }),

@@ -4,9 +4,10 @@ import { PLAYER_COLORS } from '../shared/theme.js';
 import { DEFAULT_LEVEL, LEVELS } from './levels.js';
 import connect4 from './connect4.js';
 import tictactoe from './tictactoe.js';
+import eins from './eins.js';
 
 /** The games in menu order. */
-export const GAMES = Object.fromEntries([connect4, tictactoe].map((g) => [g.id, g]));
+export const GAMES = Object.fromEntries([connect4, tictactoe, eins].map((g) => [g.id, g]));
 const ORDER = Object.keys(GAMES);
 const MAX_PLAYERS = 6;
 const NAME_MAX = 16;
@@ -25,9 +26,10 @@ const newToken = () => crypto.randomBytes(16).toString('hex');
  * game and starts it. The TV remote can do the same: ◀ ▶ pick, OK start, Back.
  *
  * Each phone holds a secret token (from join()) that it sends with every
- * request. A game is a rules module (connect4.js, tictactoe.js) with
- * create/turn/move/bot; the party seats the players, checks turns, keeps the
- * wins and lets computer players move.
+ * request. A game is a rules module (connect4.js, tictactoe.js, eins.js) with
+ * create/turn/move/bot, and public/private when not everything may be seen
+ * (Eins!'s hands); the party seats the players, checks turns, keeps the wins
+ * and lets computer players move.
  *
  * Events: 'change'; 'sound' (UI sound name); 'toast' (i18n key)
  */
@@ -298,14 +300,23 @@ export default class Party extends EventEmitter {
       selected: this.selected,
       wins: this.wins,
       game: g && {
-        id: g.id, seats: g.seats, round: g.round, pointer: g.pointer, state: g.state, turn: GAMES[g.id].turn(g.state),
+        id: g.id,
+        seats: g.seats,
+        round: g.round,
+        pointer: g.pointer,
+        state: GAMES[g.id].public?.(g.state) ?? g.state,
+        turn: GAMES[g.id].turn(g.state),
       },
     };
   }
 
-  /** The view for one phone: adds who they are (null if they haven't joined). */
+  /** The view for one phone: adds who they are (null if they haven't joined) and what only they may see. */
   viewFor(token) {
     const p = this.#byToken(token);
-    return { ...this.view(), me: p ? { id: p.id, host: p.id === this.hostId } : null };
+    const view = this.view();
+    if (!p) return { ...view, me: null };
+    const seat = this.game?.seats.indexOf(p.id) ?? -1;
+    const mine = seat >= 0 ? GAMES[this.game.id].private?.(this.game.state, seat) : undefined;
+    return { ...view, me: { id: p.id, host: p.id === this.hostId }, mine };
   }
 }

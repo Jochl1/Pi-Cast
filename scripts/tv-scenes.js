@@ -82,6 +82,32 @@ const tttWonView = party((p) => {
   p.wins = { tictactoe: { [id]: 3 } };
 });
 
+// Eins!: four players; Lea is down to one card (called), a +6 stack is open.
+const einsView = party((p) => {
+  ['Johann', 'Lea', 'Maximilian'].forEach((name) => p.join(null, { name }));
+  p.addBot(null);
+  p.select(null, 'eins');
+  p.start(null);
+  const s = p.game.state;
+  s.hands[1] = s.hands[1].slice(0, 1);
+  s.called[1] = true;
+  s.pile.push({ id: 200, color: 'g', value: '+2' }, { id: 201, color: null, value: '+4' });
+  s.color = 'b';
+  s.pending = 6;
+  s.turn = 2;
+  s.last = { seat: 1, type: 'play', card: { id: 201, color: null, value: '+4' }, color: 'b' };
+});
+const einsOverView = party((p) => {
+  p.join(null, { name: 'Johann' });
+  p.addBot(null);
+  p.select(null, 'eins');
+  p.start(null);
+  const s = p.game.state;
+  s.hands[0] = [];
+  s.pile.push({ id: 202, color: 'r', value: 'skip' });
+  Object.assign(s, { over: true, winner: 0 });
+});
+
 const swatches = Object.entries(ACCENTS).map(([id, a]) => ({ id, hex: a.hex, selected: id === 'violet' }));
 
 export const scenes = {
@@ -201,4 +227,9 @@ export const scenes = {
     layers: (t) => [gameScreens.games(t, c4WonView, gamesQr), screens.toast(t, t.tr('gamesBackAgain'), null, { top: true })],
   },
   'games-tictactoe-won': { settings: de, layers: (t) => [gameScreens.games(t, tttWonView, gamesQr)] },
+  'games-eins+toast': {
+    settings: de,
+    layers: (t) => [gameScreens.games(t, einsView, gamesQr), screens.toast(t, t.tr('gamesBackAgain'), null, { top: true })],
+  },
+  'games-eins-won': { settings: de, layers: (t) => [gameScreens.games(t, einsOverView, gamesQr)] },
 };
