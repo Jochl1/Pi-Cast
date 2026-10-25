@@ -11,6 +11,13 @@
   font-display: swap;
 }
 
+/* Only the six chess pieces, so the phone's board looks like the TV's. */
+@font-face {
+  font-family: 'DejaVu Chess';
+  src: url('/fonts/dejavu-sans-chess.woff2') format('woff2');
+  unicode-range: U+265A-265F;
+}
+
 /* Aurora · Violet defaults; app.js overwrites these from the settings. */
 :root {
   --bg: #0F0E1A;
@@ -342,6 +349,43 @@ input[type="range"] { flex-grow: 1; accent-color: var(--accent); height: 28px; }
 .eins-btn.armed { background: #FF5D5D; color: #FFFFFF; }
 .g-score { flex-wrap: wrap; }
 .g-score .score { flex: 1 1 40%; }
+
+/* Schach: the TV's board colours, from the accent. */
+.board-chess { display: flex; flex-direction: column; gap: 12px; }
+.board-chess .row { display: flex; gap: 10px; }
+.board-chess .row > * { flex: 1; }
+.c-board {
+  display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); border-radius: 10px; overflow: hidden;
+  --light: color-mix(in srgb, var(--accent) 28%, #FFFFFF); --dark: color-mix(in srgb, var(--accent) 50%, #0C0B14);
+}
+.sq {
+  position: relative; aspect-ratio: 1; border: 0; padding: 0; border-radius: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.sq:disabled { opacity: 1; cursor: default; }
+.sq.light { background: var(--light); }
+.sq.dark { background: var(--dark); }
+.sq.last { background-image: linear-gradient(rgba(255, 194, 71, 0.5), rgba(255, 194, 71, 0.5)); }
+.sq.check { background-image: linear-gradient(rgba(255, 93, 93, 0.7), rgba(255, 93, 93, 0.7)); }
+.sq.from { box-shadow: inset 0 0 0 3px #FFFFFF; }
+.sq.target::after { content: ''; width: 30%; height: 30%; border-radius: 50%; background: rgba(10, 12, 16, 0.32); }
+.sq.capture::after { content: ''; position: absolute; inset: 6%; border-radius: 50%; border: 3px solid rgba(10, 12, 16, 0.35); }
+.sq small { position: absolute; font-size: 8px; font-weight: 600; line-height: 1; }
+.sq .rank { top: 2px; left: 3px; }
+.sq .file { bottom: 2px; right: 3px; }
+.sq.light small { color: var(--dark); }
+.sq.dark small { color: var(--light); }
+.pc { font-family: 'DejaVu Chess', sans-serif; font-size: min(10.5vw, 46px); line-height: 1; }
+.pc.w { color: #FFFFFF; -webkit-text-stroke: 1.2px #1B1834; }
+.pc.b { color: #1B1834; -webkit-text-stroke: 0.8px #F5F3FF; }
+.c-promo { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.c-promo .hint { white-space: nowrap; }
+.c-promo button { width: 52px; height: 52px; font-size: 38px; border: 0; border-radius: 14px; background: var(--light, color-mix(in srgb, var(--accent) 28%, #FFFFFF)); }
+.c-offer { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: var(--radius); background: var(--surface); box-shadow: inset 0 0 0 2px #FFC247; font-weight: 600; }
+.c-offer .row > :first-child { flex: 1.5; }
+.ghost-btn.danger { background: #FF5D5D; color: #FFFFFF; }
+.c-moves .mono { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 6px; font-size: 14px; }
+.c-moves small { color: var(--muted); font-size: 14px; }
 
 /* --- Toast --- */
 .toast {

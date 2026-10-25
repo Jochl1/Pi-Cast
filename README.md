@@ -5,7 +5,7 @@ An ad-free "Chromecast" for a Raspberry Pi 3. It shows up as a cast target in th
 - **YouTube:** cast from the YouTube app. Videos are fetched directly with yt-dlp, so YouTube ads never play. Sponsor segments are skipped with SponsorBlock.
 - **Twitch and other links:** paste them into the web app, or use Share → **Send to Pi-Cast**. streamlink filters out Twitch's ad breaks.
 - **Music over AirPlay:** pick pi-cast as the AirPlay speaker in Spotify, Apple Music or any app on the iPhone. The TV shows the cover, title and progress.
-- **Game night:** Vier gewinnt (Connect Four), Tic-Tac-Toe and Eins! (a card game like Uno, for 2–6) on the TV, played from your phones: scan the QR code on the TV (▼ on the home screen) or tap the games button in the web app. Play against each other or against pi·cast at five levels.
+- **Game night:** Vier gewinnt (Connect Four), Tic-Tac-Toe, Eins! (a card game like Uno, for 2–6) and chess on the TV, played from your phones: scan the QR code on the TV (▼ on the home screen) or tap the games button in the web app. Play against each other or against pi·cast at five levels (in chess that is Stockfish, from roughly beginner to far beyond any human).
 - **Instagram Reels:** scroll through the Reels tab on the TV with the remote's arrow keys and like with OK. Use a second account: this goes through Instagram's private app API, which Instagram doesn't allow, so the account can get locked.
 - **TV:** animated boot splash, a home screen with a clock, now-playing pop-ups, a pause screen and a settings panel. Soft menu sounds and an optional startup sound. No Linux text on screen.
 

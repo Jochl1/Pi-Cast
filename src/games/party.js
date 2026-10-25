@@ -5,9 +5,10 @@ import { DEFAULT_LEVEL, LEVELS } from './levels.js';
 import connect4 from './connect4.js';
 import tictactoe from './tictactoe.js';
 import eins from './eins.js';
+import chess from './chess.js';
 
 /** The games in menu order. */
-export const GAMES = Object.fromEntries([connect4, tictactoe, eins].map((g) => [g.id, g]));
+export const GAMES = Object.fromEntries([connect4, tictactoe, eins, chess].map((g) => [g.id, g]));
 const ORDER = Object.keys(GAMES);
 const MAX_PLAYERS = 6;
 const NAME_MAX = 16;
@@ -26,10 +27,11 @@ const newToken = () => crypto.randomBytes(16).toString('hex');
  * game and starts it. The TV remote can do the same: ◀ ▶ pick, OK start, Back.
  *
  * Each phone holds a secret token (from join()) that it sends with every
- * request. A game is a rules module (connect4.js, tictactoe.js, eins.js) with
- * create/turn/move/bot, and public/private when not everything may be seen
- * (Eins!'s hands); the party seats the players, checks turns, keeps the wins
- * and lets computer players move.
+ * request. A game is a rules module (connect4.js, tictactoe.js, eins.js,
+ * chess.js) with create/turn/move/bot, public/private when not everything may
+ * be seen (Eins!'s hands), anyTime for actions that don't wait for the
+ * player's turn (resigning in chess) and close for cleaning up; the party
+ * seats the players, checks turns, keeps the wins and lets computer players move.
  *
  * Events: 'change'; 'sound' (UI sound name); 'toast' (i18n key)
  */
@@ -69,6 +71,7 @@ export default class Party extends EventEmitter {
   close() {
     if (!this.active) return;
     this.#reset();
+    for (const rules of Object.values(GAMES)) rules.close?.();
     this.log.info('game night closed');
     this.emit('sound', 'close');
     this.emit('change');
@@ -208,7 +211,7 @@ export default class Party extends EventEmitter {
   #apply(seat, action) {
     const g = this.game;
     const rules = GAMES[g.id];
-    if (rules.turn(g.state) !== seat) throw Object.assign(new Error('not your turn'), { status: 409, why: 'gamesNotYourTurn' });
+    if (!rules.anyTime?.(action) && rules.turn(g.state) !== seat) throw Object.assign(new Error('not your turn'), { status: 409, why: 'gamesNotYourTurn' });
     try {
       g.state = rules.move(g.state, seat, action ?? {});
     } catch (e) {
@@ -248,9 +251,11 @@ export default class Party extends EventEmitter {
     if (!p?.bot) return;
     this.botTimer = setTimeout(async () => {
       if (this.game !== g) return;
+      // Something can happen while it thinks (a resignation, a draw offer): then its answer is stale.
+      const { state } = g;
       try {
-        const action = await GAMES[g.id].bot(g.state, seat, p.bot);
-        if (this.game === g) this.#apply(seat, action);
+        const action = await GAMES[g.id].bot(state, seat, p.bot);
+        if (this.game === g && g.state === state) this.#apply(seat, action);
       } catch (e) {
         this.log.warn(`game night: pi·cast's move failed: ${e.message}`);
       }

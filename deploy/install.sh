@@ -92,7 +92,8 @@ install_packages() {
   sudo apt-get update
   sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
     mpv ffmpeg python3-venv curl ca-certificates cec-utils v4l-utils \
-    plymouth plymouth-themes imagemagick librsvg2-bin fontconfig git shairport-sync
+    plymouth plymouth-themes imagemagick librsvg2-bin fontconfig git shairport-sync \
+    fonts-dejavu-core stockfish # game night: the chess pieces and the chess computer
 }
 
 install_node() {

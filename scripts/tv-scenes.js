@@ -7,7 +7,9 @@ import QRCode from 'qrcode';
 import { ACCENTS } from '../src/shared/theme.js';
 import * as screens from '../src/tv/screens.js';
 import * as gameScreens from '../src/tv/games.js';
+import { Chess } from 'chess.js';
 import Party from '../src/games/party.js';
+import chessRules from '../src/games/chess.js';
 
 const base = { accent: 'violet', customAccent: '#A898FF', clock24: true, bootAnimation: true, sponsorBlock: true, cecSwitchInput: true };
 function qrModules(url) {
@@ -106,6 +108,43 @@ const einsOverView = party((p) => {
   p.start(null);
   const s = p.game.state;
   Object.assign(s, { over: true, winner: 2, finished: [2, 0, 4, 1, 3] });
+});
+
+// Schach: moves given in SAN, played through the rules module.
+function chessPlay(p, sans) {
+  const board = new Chess();
+  for (const san of sans) {
+    const { from, to, promotion } = board.move(san);
+    p.game.state = chessRules.move(p.game.state, p.game.state.turn, { type: 'move', from, to, promotion });
+  }
+}
+// Against pi·cast; Johann has tapped his knight on g5, so its moves show.
+const chessView = party((p) => {
+  const a = p.join(null, { name: 'Johann' }).token;
+  p.addBot(null);
+  p.select(null, 'chess');
+  p.start(null);
+  chessPlay(p, ['e4', 'e5', 'Nf3', 'Nc6', 'Bc4', 'Bc5', 'c3', 'Nf6', 'd4', 'exd4', 'cxd4', 'Bb4+', 'Nc3', 'Nxe4', 'O-O', 'Bxc3',
+    'd5', 'Bf6', 'Re1', 'Ne7', 'Rxe4', 'd6', 'Bg5', 'Bxg5', 'Nxg5', 'h6']);
+  p.point(a, 'g5');
+});
+// Two people; Lea (white this round) gives check and offers a draw.
+const chessCheckView = party((p) => {
+  const { id } = p.join(null, { name: 'Johann' });
+  p.join(null, { name: 'Lea' });
+  p.select(null, 'chess');
+  p.rounds.chess = 1;
+  p.start(null);
+  chessPlay(p, ['d4', 'd5', 'c4', 'e6', 'Nc3', 'Nf6', 'Bg5', 'Bb4', 'cxd5', 'exd5', 'Qa4+']);
+  p.game.state = chessRules.move(p.game.state, 1, { type: 'offer' });
+  p.wins = { chess: { [id]: 1 } };
+});
+const chessMateView = party((p) => {
+  p.join(null, { name: 'Johann' });
+  p.join(null, { name: 'Maximilian' });
+  p.select(null, 'chess');
+  p.start(null);
+  chessPlay(p, ['e4', 'e5', 'Bc4', 'Nc6', 'Qh5', 'Nf6', 'Qxf7#']);
 });
 
 const swatches = Object.entries(ACCENTS).map(([id, a]) => ({ id, hex: a.hex, selected: id === 'violet' }));
@@ -231,5 +270,11 @@ export const scenes = {
     settings: de,
     layers: (t) => [gameScreens.games(t, einsView, gamesQr), screens.toast(t, t.tr('gamesBackAgain'), null, { top: true })],
   },
+  'games-chess': { settings: de, layers: (t) => [gameScreens.games(t, chessView, gamesQr)] },
+  'games-chess-check+toast': {
+    settings: { ...de, accent: 'mint' },
+    layers: (t) => [gameScreens.games(t, chessCheckView, gamesQr), screens.toast(t, t.tr('gamesBackAgain'), null, { top: true })],
+  },
+  'games-chess-mate': { settings: de, layers: (t) => [gameScreens.games(t, chessMateView, gamesQr)] },
   'games-eins-won': { settings: de, layers: (t) => [gameScreens.games(t, einsOverView, gamesQr)] },
 };

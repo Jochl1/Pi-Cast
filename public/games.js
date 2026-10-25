@@ -1,4 +1,5 @@
 import { PLAYER_COLORS } from '/shared/theme.js';
+import { germanSan, GLYPHS } from '/shared/chessNotation.js';
 
 // Game night on the phone (#games): join with a name and colour, the lobby
 // (the host adds pi·cast, picks and starts a game) and the controllers.
@@ -40,6 +41,9 @@ export function createGames({ api, getTr, reconnect }) {
   let picked = null; // Eins!: the card tapped, and the colour for a wild
   let wildColor = null;
   let einsArmed = false; // Eins!: "EINS!" pressed, sent with the next card
+  let from = null; // Schach: the square tapped, and the move waiting for a promotion piece
+  let promoting = null;
+  let resignAt = 0; // Schach: "Aufgeben" tapped once, at this time
 
   const post = (path, body) => api('POST', path, body).catch(() => {});
 
@@ -158,6 +162,8 @@ export function createGames({ api, getTr, reconnect }) {
       $('g-act').hidden = true;
     } else if (g.id === 'eins') {
       renderEins(tr, g, players, seat, mine);
+    } else if (g.id === 'chess') {
+      renderChess(tr, g, players, seat, mine);
     }
 
     const wins = view.wins[g.id] ?? {};
@@ -253,6 +259,122 @@ export function createGames({ api, getTr, reconnect }) {
     let hint = '';
     if (mine && s.pending) hint = tr('einsMustStack', { n: s.pending });
     else if (mine && hand.length === 2 && !einsArmed) hint = tr('einsCallHint');
+    $('g-hint').textContent = hint;
+    $('g-act').hidden = true;
+  }
+
+  // --- Schach ---
+
+  const FILES = 'abcdefgh';
+  const RESIGN_CONFIRM_MS = 3000;
+  // U+FE0E: the text pawn, not iOS's emoji pawn.
+  const glyph = (type) => `${GLYPHS[type]}\uFE0E`;
+  const square = (i) => FILES[i % 8] + (8 - Math.floor(i / 8));
+
+  function pickSquare(tr, sq) {
+    from = sq;
+    promoting = null;
+    post('/api/party/point', { value: sq });
+    renderPlay(tr);
+  }
+
+  function renderChess(tr, g, players, seat, mine) {
+    const s = g.state;
+    const color = seat < 0 ? 'w' : s.white === seat ? 'w' : 'b';
+    if (!mine || (from && !s.legal[from])) { from = null; promoting = null; }
+    const targets = new Set(from ? s.legal[from] : []);
+    // Black sees the board from their side.
+    const order = [...Array(64).keys()];
+    if (color === 'b') order.reverse();
+
+    const board = el('div', { class: 'c-board' }, ...order.map((i, k) => {
+      const sq = square(i);
+      const p = s.board[i];
+      const light = (Math.floor(i / 8) + (i % 8)) % 2 === 0;
+      const cls = ['sq', light ? 'light' : 'dark'];
+      if (s.last?.includes(sq)) cls.push('last');
+      if (s.check === sq) cls.push('check');
+      if (sq === from) cls.push('from');
+      if (targets.has(sq)) cls.push(p ? 'capture' : 'target');
+      const own = p && p[0] === s.toMove;
+      return el('button', {
+        type: 'button', class: cls.join(' '), disabled: !mine || !(own || targets.has(sq)), 'aria-label': sq,
+        onclick: () => {
+          if (targets.has(sq)) {
+            const moving = s.board[FILES.indexOf(from[0]) + (8 - Number(from[1])) * 8];
+            if (moving?.[1] === 'p' && (sq[1] === '8' || sq[1] === '1')) {
+              promoting = { from, to: sq };
+              renderPlay(tr);
+              return;
+            }
+            post('/api/party/move', { action: { type: 'move', from, to: sq } });
+            from = null;
+          } else pickSquare(tr, sq === from ? null : sq);
+          renderPlay(tr);
+        },
+      },
+      k % 8 === 0 ? el('small', { class: 'rank' }, sq[1]) : null,
+      k >= 56 ? el('small', { class: 'file' }, sq[0]) : null,
+      p ? el('span', { class: `pc ${p[0]}` }, glyph(p[1])) : null);
+    }));
+
+    const promo = promoting ? el('div', { class: 'c-promo' },
+      el('span', { class: 'hint' }, tr('chessPromote')),
+      ...['q', 'r', 'b', 'n'].map((type) => el('button', {
+        type: 'button', class: `pc ${color}`, 'aria-label': type,
+        onclick: () => {
+          post('/api/party/move', { action: { type: 'move', ...promoting, promotion: type } });
+          from = null;
+          promoting = null;
+          renderPlay(tr);
+        },
+      }, glyph(type)))) : null;
+
+    // A draw offer: answer it, or see that yours stands.
+    const other = 1 - seat;
+    let offer = null;
+    if (seat >= 0 && !s.over && s.offer === other) {
+      offer = el('div', { class: 'c-offer' },
+        el('div', {}, tr('chessTheyOffer', { name: players[other].name })),
+        el('div', { class: 'row' },
+          el('button', { type: 'button', class: 'accent-btn wide', onclick: () => post('/api/party/move', { action: { type: 'accept' } }) }, tr('chessAccept')),
+          el('button', { type: 'button', class: 'ghost-btn', onclick: () => post('/api/party/move', { action: { type: 'decline' } }) }, tr('chessDecline'))));
+    }
+    const sure = Date.now() - resignAt < RESIGN_CONFIRM_MS;
+    const buttons = seat >= 0 && !s.over ? el('div', { class: 'row' },
+      el('button', {
+        type: 'button', class: 'ghost-btn', disabled: s.offer != null,
+        onclick: () => post('/api/party/move', { action: { type: 'offer' } }),
+      }, s.offer === seat ? tr('chessOffered') : tr('chessOffer')),
+      el('button', {
+        type: 'button', class: `ghost-btn${sure ? ' danger' : ''}`,
+        onclick: () => {
+          if (Date.now() - resignAt < RESIGN_CONFIRM_MS) {
+            resignAt = 0;
+            post('/api/party/move', { action: { type: 'resign' } });
+          } else {
+            resignAt = Date.now();
+            setTimeout(() => renderPlay(tr), RESIGN_CONFIRM_MS);
+          }
+          renderPlay(tr);
+        },
+      }, sure ? tr('chessResignSure') : tr('chessResign'))) : null;
+
+    // The last three moves of each side, numbered.
+    const recent = [];
+    const start = Math.max(0, s.sans.length - 6) & ~1;
+    for (let i = start; i < s.sans.length; i += 2) {
+      recent.push(el('span', {}, el('small', {}, `${i / 2 + 1}.`), ` ${germanSan(s.sans[i])} ${s.sans[i + 1] ? germanSan(s.sans[i + 1]) : ''}`));
+    }
+    const moves = recent.length ? el('div', { class: 'c-moves' }, el('h2', { class: 'section-label' }, tr('chessLastMoves')), el('div', { class: 'mono' }, ...recent)) : null;
+
+    const boardEl = $('g-board');
+    boardEl.className = 'board-chess';
+    boardEl.replaceChildren(...[offer, board, promo, buttons, moves].filter(Boolean));
+    let hint = '';
+    if (s.over) hint = tr(`chessResult_${s.result}`, { name: s.resigned != null ? players[s.resigned].name : '' });
+    else if (s.declined != null && s.declined !== seat && seat >= 0) hint = tr('chessDeclined');
+    else if (mine && !from) hint = tr('chessHint');
     $('g-hint').textContent = hint;
     $('g-act').hidden = true;
   }

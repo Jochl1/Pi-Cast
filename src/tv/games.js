@@ -4,6 +4,7 @@ import {
 } from './ass.js';
 import { W, H, qrTile } from './screens.js';
 import { COLS, ROWS } from '../games/connect4.js';
+import { germanSan, GLYPHS } from '../shared/chessNotation.js';
 
 /**
  * Game night on the TV (see games/party.js): the lobby ("Wer spielt mit?"
@@ -70,6 +71,14 @@ const icons = {
       ...card(t, bx, by, w, h, { color: 'b', value: '7' }, 16),
       ...card(t, bx, by, w, h, { color: 'y', value: '3' }, -16),
       ...card(t, bx, by, w, h, { color: 'r', value: '1' }, 0),
+    ];
+  },
+  chess(t, x, y, s) {
+    const c = s / 2;
+    return [
+      rect(x, y, c, c, { color: '#FFFFFF', opacity: 0.16 }), rect(x + c, y + c, c, c, { color: '#FFFFFF', opacity: 0.16 }),
+      rect(x + c, y, c, c, { color: '#FFFFFF', opacity: 0.06 }), rect(x, y + c, c, c, { color: '#FFFFFF', opacity: 0.06 }),
+      piece(x + s / 2, y + s / 2, s * 0.62, 'w', 'n', '#FFFFFF', t.iconBg),
     ];
   },
   tictactoe(t, x, y, s) {
@@ -418,7 +427,179 @@ function standings(t, players, finished) {
   return [...ev, hints(t, [['OK', t.tr('gamesAgain')], [t.tr('keyBack'), t.tr('gamesToLobby')]])];
 }
 
-const BOARDS = { connect4, tictactoe, eins };
+// --- Schach ---
+
+/** Mixes two '#RRGGBB' colours: `k` 0 is `a`, 1 is `b`. */
+function mix(a, b, k) {
+  const pa = parseInt(a.slice(1), 16);
+  const pb = parseInt(b.slice(1), 16);
+  const ch = (shift) => Math.round(((pa >> shift) & 255) * (1 - k) + ((pb >> shift) & 255) * k);
+  return `#${[16, 8, 0].map((sh) => ch(sh).toString(16).padStart(2, '0')).join('')}`;
+}
+
+const AMBER = '#FFC247';
+const RED = '#FF5D5D';
+const WHITE_PIECE = '#FFFFFF';
+const BLACK_PIECE = '#1B1834';
+
+/** A piece glyph (DejaVu Sans) centred on (cx, cy), `size` px tall: filled in `fill` with an `edge` outline. */
+function piece(cx, cy, size, color, type, fill = color === 'w' ? WHITE_PIECE : BLACK_PIECE, edge = color === 'w' ? '#1B1834' : '#F5F3FF') {
+  const bord = Math.max(1.5, size * (color === 'w' ? 0.03 : 0.022));
+  return text(`{\\bord${bord.toFixed(1)}${paint(edge, 0.95, 3)}}${GLYPHS[type]}`, {
+    x: cx, y: cy + size * 0.04, an: 5, px: size, font: 'DejaVu Sans', color: fill,
+  });
+}
+
+/** The board's two square colours from the accent: a pale light square and a deep dark one. */
+const squareColors = (t) => ({ light: mix(t.accent, '#FFFFFF', 0.72), dark: mix(t.accent, t.bg, 0.5) });
+
+const CHESS_CELL = 100;
+const CHESS_BOARD = { x: (1920 - 8 * CHESS_CELL) / 2, y: 150 };
+
+/**
+ * The board, white at the bottom: the light squares are one rectangle and the
+ * dark ones one shape (two bitmaps, not 64), the last move tinted amber, a king
+ * in check red, and the square the player has tapped on their phone framed
+ * white with its moves as dots (rings on captures).
+ */
+function chessBoard(t, s, pointer, turn) {
+  const { x: bx, y: by } = CHESS_BOARD;
+  const S = CHESS_CELL;
+  const { light, dark } = squareColors(t);
+  const at = (sq) => [bx + (sq.charCodeAt(0) - 97) * S, by + (8 - Number(sq[1])) * S];
+  const darkPath = [];
+  for (let r = 0; r < 8; r++) {
+    for (let f = 0; f < 8; f++) {
+      if ((r + f) % 2 === 0) continue;
+      const [x0, y0] = [f * S, r * S];
+      darkPath.push(`m ${x0} ${y0} l ${x0 + S} ${y0} ${x0 + S} ${y0 + S} ${x0} ${y0 + S}`);
+    }
+  }
+  const ev = [
+    rect(bx, by, 8 * S, 8 * S, { color: light }),
+    `{\\an7\\pos(${bx},${by})\\bord0\\shad0${paint(dark)}\\p1}${darkPath.join(' ')}{\\p0}`,
+  ];
+  for (const sq of s.last ?? []) ev.push(rect(...at(sq), S, S, { color: AMBER, opacity: 0.5 }));
+  if (s.check) ev.push(rect(...at(s.check), S, S, { color: RED, opacity: 0.65 }));
+  const picked = turn != null && pointer?.seat === turn && typeof pointer.value === 'string' ? pointer.value : null;
+  if (picked) ev.push(rect(...at(picked), S, S, { color: '#FFFFFF', opacity: 0, border: 5, borderColor: '#FFFFFF' }));
+
+  // Coordinates in the corners: ranks top left in the a-file, files bottom right on rank 1.
+  for (let i = 0; i < 8; i++) {
+    // In the other square colour: a8 is light, a1 dark.
+    const other = (k) => (k % 2 === 0 ? dark : light);
+    ev.push(text(String(8 - i), { x: bx + 7, y: by + i * S + 5, an: 7, px: 18, weight: 600, color: other(i), opacity: 0.9 }));
+    ev.push(text(String.fromCharCode(97 + i), { x: bx + i * S + S - 7, y: by + 8 * S - 4, an: 3, px: 18, weight: 600, color: other(i + 1), opacity: 0.9 }));
+  }
+  s.board.forEach((p, i) => {
+    if (p) ev.push(piece(bx + (i % 8) * S + S / 2, by + Math.floor(i / 8) * S + S / 2, S * 0.8, p[0], p[1]));
+  });
+  for (const to of picked ? s.legal[picked] ?? [] : []) {
+    const [x, y] = at(to);
+    const i = (8 - Number(to[1])) * 8 + (to.charCodeAt(0) - 97);
+    if (s.board[i]) ev.push(ring(x + S / 2, y + S / 2, S * 0.44, 6, ON_ACCENT, 0.35));
+    else ev.push(circle(x + S / 2, y + S / 2, 16, { color: ON_ACCENT, opacity: 0.32 }));
+  }
+  return ev;
+}
+
+/** One player's card at the left: avatar, name, colour, whose turn, a draw offer and wins. */
+function chessPlayer(t, view, p, seat, y, h) {
+  const s = view.game.state;
+  const x = PAD_X;
+  const w = 404;
+  const turn = view.game.turn === seat;
+  const color = s.white === seat ? 'w' : 'b';
+  const ev = [glass(x, y, w, h, 36, turn, t)];
+  ev.push(...avatar(t, x + 92, y + 96, 56, p));
+  ev.push(text(nameOf(t, p, 40, 200), { x: x + 172, y: y + 76, an: 4, px: 40, weight: 600, color: t.text }));
+  ev.push(piece(x + 188, y + 124, 34, color, 'k'));
+  ev.push(text(escape(t.tr(color === 'w' ? 'chessWhite' : 'chessBlack')), { x: x + 214, y: y + 124, an: 4, px: 28, color: t.muted }));
+  if (s.offer === seat) {
+    ev.push(text(`{${paint(AMBER)}}● {${paint(t.text)}}${escape(t.tr('chessOffers'))}`, { x: x + 40, y: y + 196, an: 4, px: 28, weight: 500 }));
+  }
+  const by = y + h - 64;
+  if (turn && p.bot) ev.push(text(escape(t.tr('gamesThinking')), { x: x + 40, y: by, an: 4, px: 28, color: t.muted }));
+  else if (turn) {
+    const label = t.tr('gamesTurn').toLocaleUpperCase(t.tr.locale);
+    const pw = Math.max(170, label.length * 22 * 0.75 + 56);
+    ev.push(rect(x + 40, by - 26, pw, 52, { color: t.accent, radius: 26 }));
+    ev.push(text(escape(label), { x: x + 40 + pw / 2, y: by, an: 5, px: 22, weight: 600, spacing: 3, color: ON_ACCENT }));
+  }
+  ev.push(text(`{${paint(t.muted)}}${escape(t.tr('gamesWins'))} {${paint(t.text)}}${winsOf(view, p)}`, { x: x + w - 40, y: by, an: 6, px: 28, weight: 500 }));
+  return ev;
+}
+
+/** "ZÜGE": the moves in German notation, numbered in pairs, the newest at the bottom in the accent. */
+function chessMoves(t, sans, y, h) {
+  const x = W - PAD_X - 404;
+  const ev = [rect(x, y, 404, h, { color: '#FFFFFF', opacity: 0.055, radius: 36 })];
+  ev.push(smallLabel(t, t.tr('chessMoves'), x + 40, y + 34));
+  const rowH = 46;
+  const maxRows = Math.floor((h - 120) / rowH);
+  const pairs = Math.ceil(sans.length / 2);
+  const first = Math.max(0, pairs - maxRows);
+  for (let n = first; n < pairs; n++) {
+    const ry = y + 104 + (n - first) * rowH;
+    ev.push(text(`${n + 1}.`, { x: x + 92, y: ry, an: 9, px: 28, font: 'JetBrains Mono', color: t.muted }));
+    for (const k of [0, 1]) {
+      const i = 2 * n + k;
+      if (i >= sans.length) continue;
+      ev.push(text(escape(germanSan(sans[i])), {
+        x: x + 120 + k * 136, y: ry, an: 7, px: 28, font: 'JetBrains Mono', weight: i === sans.length - 1 ? 500 : 400,
+        color: i === sans.length - 1 ? t.accent : t.text,
+      }));
+    }
+  }
+  return ev;
+}
+
+function chess(t, view) {
+  const g = view.game;
+  const s = g.state;
+  const players = seated(view);
+  const bot = players.find((p) => p.bot);
+  const { y: by } = CHESS_BOARD;
+  const size = 8 * CHESS_CELL;
+  const ev = [
+    smallLabel(t, t.tr('game_chess'), PAD_X, PAD_Y - 20),
+    text(bot ? `pi${span('·', t.accent)}${span(`cast · ${escape(t.tr('chessLevel', { n: bot.bot }))}`, t.muted)}`
+      : escape(t.tr('gamesRound', { n: g.round + 1 })), { x: W - PAD_X, y: PAD_Y - 20, an: 9, px: 28, color: t.muted }),
+    ...chessBoard(t, s, g.pointer, g.turn),
+  ];
+  // Black's player at the top, white's at the bottom, like the board.
+  const cardH = 340;
+  const black = 1 - s.white;
+  ev.push(...chessPlayer(t, view, players[black], black, by, cardH));
+  ev.push(...chessPlayer(t, view, players[s.white], s.white, by + size - cardH, cardH));
+  if (s.check && !s.over) {
+    const label = t.tr('chessCheck').toLocaleUpperCase(t.tr.locale);
+    ev.push(rect(PAD_X + 202 - 90, by + size / 2 - 28, 180, 56, { color: RED, radius: 28 }));
+    ev.push(text(escape(label), { x: PAD_X + 202, y: by + size / 2, an: 5, px: 24, weight: 700, spacing: 3, color: '#FFFFFF' }));
+  }
+  ev.push(...chessMoves(t, s.sans, by, size));
+
+  if (s.over) {
+    const msg = s.winner != null ? t.tr('gamesWinner', { name: players[s.winner].name }) : t.tr('chessDraw');
+    const why = t.tr(`chessResult_${s.result}`, { name: s.resigned != null ? players[s.resigned].name : '' });
+    const cy = by + size / 2;
+    ev.push(
+      // Solid: through glass, the squares and pieces under it would show.
+      rect(W / 2 - 340, cy - 84, 680, 168, { color: t.bg, radius: 48 }),
+      rect(W / 2 - 340, cy - 84, 680, 168, {
+        color: t.accent, opacity: 0.18, radius: 48, border: 2, borderColor: t.accent, borderOpacity: 0.5,
+      }),
+      text(escape(fit(msg, 48, 620)), { x: W / 2, y: cy - 22, an: 5, px: 48, weight: 600, color: t.text }),
+      text(escape(why), { x: W / 2, y: cy + 40, an: 5, px: 30, color: t.muted }),
+      hints(t, [['OK', t.tr('gamesAgain')], [t.tr('keyBack'), t.tr('gamesToLobby')]]),
+    );
+  } else ev.push(hints(t, [[t.tr('keyBack'), t.tr('gamesEnd')]]));
+  return ev;
+}
+
+const BOARDS = {
+  connect4, tictactoe, eins, chess,
+};
 
 /** The game night screen: the lobby, or the game being played. */
 export function games(t, view, qr) {
