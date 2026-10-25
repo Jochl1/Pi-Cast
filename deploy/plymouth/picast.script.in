@@ -1,8 +1,10 @@
 # Pi-Cast boot splash. Generated from deploy/plymouth/picast.script.in by
 # src/boot.js; @NAME@ placeholders are filled in from the current theme.
 #
-# Layout is designed for 1080p and scaled to the actual screen. Plymouth draws
-# in software, so the glows move slowly and only every few frames.
+# Layout is designed for 1080p and scaled to the actual screen: the wordmark,
+# three dots below it that pulse one after another like the TV's loading dots
+# (screens.dots()), and "STARTING UP" at the bottom. Plymouth draws in
+# software, so the dots only change every few frames.
 
 Window.SetBackgroundTopColor(@BG_R@, @BG_G@, @BG_B@);
 Window.SetBackgroundBottomColor(@BG_R@, @BG_G@, @BG_B@);
@@ -17,77 +19,70 @@ fun load(file) {
   return img.Scale(Math.Int(img.GetWidth() * scale), Math.Int(img.GetHeight() * scale));
 }
 
-# --- Glows (Aurora only; the files are empty for other styles) ---
-glow_a.image = load("glow-a.png");
-glow_a.sprite = Sprite(glow_a.image);
-glow_a.cx = 450 * scale;
-glow_a.cy = 270 * scale;
-glow_a.period = 14;
-# Keyframes (offsets in 1080p px): start, middle, end, like the design's CSS.
-glow_a.x0 = -150; glow_a.y0 = -60;
-glow_a.x1 = 180;  glow_a.y1 = 90;
-glow_a.x2 = 30;   glow_a.y2 = 180;
-
-glow_b.image = load("glow-b.png");
-glow_b.sprite = Sprite(glow_b.image);
-glow_b.cx = 1590 * scale;
-glow_b.cy = 990 * scale;
-glow_b.period = 18;
-glow_b.x0 = 120;  glow_b.y0 = 90;
-glow_b.x1 = -180; glow_b.y1 = -60;
-glow_b.x2 = -30;  glow_b.y2 = -150;
-
-fun ease(k) {
-  return (1 - Math.Cos(k * 3.14159265)) / 2;
-}
-
-# Places a glow at time t (seconds): keyframes 0 -> 1 -> 2, then back (alternate).
-fun place(g, t) {
-  phase = t / g.period;
-  phase = phase - Math.Int(phase / 2) * 2;
-  if (phase > 1) phase = 2 - phase;
-  if (phase < 0.5) {
-    k = ease(phase * 2);
-    dx = g.x0 + (g.x1 - g.x0) * k;
-    dy = g.y0 + (g.y1 - g.y0) * k;
-  } else {
-    k = ease((phase - 0.5) * 2);
-    dx = g.x1 + (g.x2 - g.x1) * k;
-    dy = g.y1 + (g.y2 - g.y1) * k;
-  }
-  g.sprite.SetX(Math.Int(g.cx + dx * scale - g.image.GetWidth() / 2));
-  g.sprite.SetY(Math.Int(g.cy + dy * scale - g.image.GetHeight() / 2));
-  g.sprite.SetZ(0);
-}
-
-place(glow_a, 0);
-place(glow_b, 0);
-
 # --- Wordmark, dots and "STARTING UP" ---
 wordmark.image = load("wordmark.png");
 wordmark.sprite = Sprite(wordmark.image);
-dots.image = load("dots.png");
-dots.sprite = Sprite(dots.image);
 status.image = load("status.png");
 status.sprite = Sprite(status.image);
 
-block_h = wordmark.image.GetHeight() + 54 * scale + dots.image.GetHeight();
+block_h = wordmark.image.GetHeight() + 54 * scale + 26 * scale;
 top = (screen_h - block_h) / 2;
 wordmark.sprite.SetPosition(Math.Int((screen_w - wordmark.image.GetWidth()) / 2), Math.Int(top), 10);
-dots.sprite.SetPosition(Math.Int((screen_w - dots.image.GetWidth()) / 2),
-  Math.Int(top + wordmark.image.GetHeight() + 54 * scale), 10);
 status.sprite.SetPosition(Math.Int((screen_w - status.image.GetWidth()) / 2),
   Math.Int(screen_h - 60 * scale - status.image.GetHeight()), 10);
 
-# --- Animation: ~12 position updates per second at Plymouth's ~50 Hz refresh ---
+# The dot images are 26 px (radius 13, the largest a dot gets).
+dot_image = Image("dot.png");
+accent_image = Image("dot-accent.png");
+dots_cy = top + wordmark.image.GetHeight() + 54 * scale + 13 * scale;
+for (i = 0; i < 3; i++) {
+  dot[i].sprite = Sprite();
+  dot[i].sprite.SetZ(10);
+  dot[i].cx = screen_w / 2 + (i - 1) * 36 * scale;
+}
+
+# Dot i (0..2, the middle one in the accent) at `pulse` 0..1: radius 9..13,
+# and brighter, as in screens.dots().
+fun show_dot(i, pulse) {
+  if (i == 1) {
+    img = accent_image;
+    opacity = 0.55 + 0.45 * pulse;
+  } else {
+    img = dot_image;
+    opacity = 0.25 + 0.5 * pulse;
+  }
+  size = Math.Int(2 * (9 + 4 * pulse) * scale);
+  dot[i].sprite.SetImage(img.Scale(size, size));
+  dot[i].sprite.SetX(Math.Int(dot[i].cx - size / 2));
+  dot[i].sprite.SetY(Math.Int(dots_cy - size / 2));
+  dot[i].sprite.SetOpacity(opacity);
+}
+
+# A 1.2 s cycle; each dot swells in turn.
+fun place_dots(t) {
+  phase = t / 1.2;
+  for (i = 0; i < 3; i++) {
+    p = phase - i / 3 + 1;
+    p = p - Math.Int(p);
+    c = Math.Cos(p * 2 * 3.14159265);
+    if (c < 0) c = 0;
+    show_dot(i, c * c);
+  }
+}
+
+if (animate) {
+  place_dots(0);
+} else {
+  show_dot(0, 0);
+  show_dot(1, 1);
+  show_dot(2, 0);
+}
+
+# --- Animation: ~12 updates per second at Plymouth's ~50 Hz refresh ---
 frame = 0;
 fun refresh() {
   frame++;
-  if (animate && frame % 4 == 0) {
-    t = frame / 50;
-    place(glow_a, t);
-    place(glow_b, t);
-  }
+  if (animate && frame % 4 == 0) place_dots(frame / 50);
 }
 Plymouth.SetRefreshFunction(refresh);
 

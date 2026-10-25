@@ -15,13 +15,6 @@ const SPLASH_KEYS = ['accent', 'customAccent', 'bootAnimation', 'language'];
 
 const svg = (w, h, body) => `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${body}</svg>`;
 
-function glowSvg(size, color, peak) {
-  return svg(size, size, `<defs><radialGradient id="g">
-    <stop offset="0" stop-color="${color}" stop-opacity="${peak}"/>
-    <stop offset="0.66" stop-color="${color}" stop-opacity="0"/>
-  </radialGradient></defs><circle cx="${size / 2}" cy="${size / 2}" r="${size / 2}" fill="url(#g)"/>`);
-}
-
 /** Renders the boot splash images and script for `settings` into `outDir`. */
 export async function buildSplash(settings, outDir = SPLASH_DIR) {
   const t = themeFor(settings);
@@ -33,14 +26,17 @@ export async function buildSplash(settings, outDir = SPLASH_DIR) {
   // Sizes at 1080p; the script scales them to the real screen.
   await put('wordmark.png', svg(520, 180, `<text x="260" y="128" text-anchor="middle" font-family="Sora" font-weight="600"
     font-size="132" letter-spacing="-2.6" fill="${t.text}">pi<tspan fill="${t.accent}">·</tspan>cast</text>`));
-  await put('dots.png', svg(66, 18, [9, 33, 57].map((cx, i) => {
-    const { r, g, b, a } = parseColor(i === 1 ? t.accent : t.dim);
-    return `<circle cx="${cx}" cy="9" r="9" fill="rgb(${r},${g},${b})" fill-opacity="${a}"/>`;
-  }).join('')));
+  // One dot at its largest (13 px, like screens.dots()); the script scales and fades it.
+  const dot = (color) => {
+    const { r, g, b } = parseColor(color);
+    return svg(26, 26, `<circle cx="13" cy="13" r="13" fill="rgb(${r},${g},${b})"/>`);
+  };
+  await put('dot.png', dot(t.text));
+  await put('dot-accent.png', dot(t.accent));
   await put('status.png', svg(360, 48, `<text x="180" y="36" text-anchor="middle" font-family="Sora"
     font-size="33" letter-spacing="2.6" fill="${t.muted}">${xml(translator(settings.language)('startingUp'))}</text>`));
-  await put('glow-a.png', glowSvg(1080, t.accent, 0.45));
-  await put('glow-b.png', glowSvg(990, t.accent, 0.30));
+  // From older versions; the install helper copies every PNG.
+  for (const old of ['glow-a.png', 'glow-b.png', 'dots.png']) fs.rmSync(path.join(outDir, old), { force: true });
 
   const bg = parseColor(t.bg);
   const script = fs.readFileSync(path.join(ROOT, 'deploy', 'plymouth', 'picast.script.in'), 'utf8')

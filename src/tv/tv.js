@@ -29,22 +29,25 @@ const BUFFERING_MS = 1000;
 const UNHOLD_MS = 400;
 // The big heart after a like fades out over this long.
 const PULSE_MS = 700;
+// How long the power row waits for its second OK.
+const POWER_CONFIRM_MS = 4000;
 
 /**
  * Everything drawn on the TV: home screen, loading, now-playing pop-ups,
  * pause screen, settings panel, Reels, AirPlay and toasts. Redraws only when something
  * visible changes, since every redraw costs CPU on a Pi 3.
+ * `powerOff`: called by the settings panel's power row.
  */
 export default class Tv {
   constructor({
-    mpv, playback, cast, settings, sounds, reels, weather, instagram, airplay, twitchLive, log, remote,
+    mpv, playback, cast, settings, sounds, reels, weather, instagram, airplay, twitchLive, log, remote, powerOff,
   }) {
     Object.assign(this, {
-      mpv, playback, cast, settings, sounds, reels, weather, instagram, airplay, twitchLive, log, remote,
+      mpv, playback, cast, settings, sounds, reels, weather, instagram, airplay, twitchLive, log, remote, powerOff,
     });
     this.cover = { image: null, want: null }; // AirPlay's cover: the image and its bitmap
     this.sent = {};
-    this.panel = { open: false, focus: 0 };
+    this.panel = { open: false, focus: 0, powerConfirm: null }; // powerConfirm: a timer while it waits
     this.card = null; // { until, quality }
     this.sender = null; // { name, until }
     this.message = null; // { text, until }
@@ -152,7 +155,7 @@ export default class Tv {
   key(k) {
     if (!this.panel.open) {
       if (k !== 'ok' || this.screen() !== 'home') return false;
-      this.panel = { open: true, focus: 0 };
+      this.panel = { open: true, focus: 0, powerConfirm: null };
       this.playback.holdBackground('panel', true);
       this.sounds.play('open');
       this.render();
@@ -161,6 +164,11 @@ export default class Tv {
     const rows = screens.PANEL_ROWS;
     const row = rows[this.panel.focus];
     const { focus } = this.panel;
+    if (row.key === 'power' && (k === 'ok' || k === 'left' || k === 'right')) {
+      if (k === 'ok') this.#powerKey();
+      return true;
+    }
+    this.#cancelPower();
     switch (k) {
       case 'up': this.panel.focus = Math.max(0, focus - 1); break;
       case 'down': this.panel.focus = Math.min(rows.length - 1, focus + 1); break;
@@ -175,6 +183,28 @@ export default class Tv {
     else this.sounds.play('select');
     this.render();
     return true;
+  }
+
+  /** OK on the power row: the first asks, the second (within a few seconds) powers off. */
+  #powerKey() {
+    if (this.panel.powerConfirm) {
+      this.#cancelPower();
+      this.panel.open = false;
+      this.toast(screens.look(this.settings.get()).tr('poweringOff'), { sound: 'select' });
+      this.powerOff?.();
+      return;
+    }
+    this.sounds.play('select');
+    this.panel.powerConfirm = setTimeout(() => {
+      this.panel.powerConfirm = null;
+      this.render();
+    }, POWER_CONFIRM_MS);
+    this.render();
+  }
+
+  #cancelPower() {
+    clearTimeout(this.panel.powerConfirm);
+    this.panel.powerConfirm = null;
   }
 
   #change(key, dir) {
@@ -337,6 +367,7 @@ export default class Tv {
       layers.panel = screens.settingsPanel(t, {
         settings: s,
         focus: this.panel.focus,
+        powerConfirm: !!this.panel.powerConfirm,
         swatches: ids.map((id) => ({
           id, hex: id === 'custom' ? s.customAccent : ACCENTS[id].hex, selected: id === s.accent,
         })),

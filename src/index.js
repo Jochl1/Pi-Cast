@@ -1,3 +1,4 @@
+import { execFile } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { loadConfig, DATA_DIR } from './config.js';
@@ -151,9 +152,22 @@ const weather = new Weather({ settings, log });
 weather.start();
 const twitchLive = new TwitchLive({ settings, playback, log });
 twitchLive.start();
+/**
+ * The settings panel's power row. A Pi 3 only starts again when its power is
+ * reconnected. The toast shows for a moment first; systemd then stops Pi-Cast
+ * as usual. Allowed through a sudoers rule for exactly this (install.sh).
+ */
+function powerOff() {
+  log.info('powering off (settings panel)');
+  setTimeout(() => {
+    execFile('sudo', ['-n', 'systemctl', 'poweroff'], (e) => {
+      if (e) log.warn('powering off failed:', e.message);
+    });
+  }, 1500);
+}
 const tv = new Tv({
   mpv, playback, cast, settings, sounds, reels, weather, instagram, airplay, twitchLive, log,
-  remote: `${os.hostname()}.local:${config.webPort}`,
+  remote: `${os.hostname()}.local:${config.webPort}`, powerOff,
 });
 tv.start();
 reels.on('toast', (key, sound) => tv.toast(translator(settings.get().language)(key), { sound }));

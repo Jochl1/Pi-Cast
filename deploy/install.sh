@@ -258,10 +258,12 @@ install -m 644 "\$SRC"/*.png "\$SRC/picast.script" "\$SRC/picast.plymouth" "\$DE
 plymouth-set-default-theme -R picast >/dev/null
 EOF
 
-  # The splash helper, and restarting shairport-sync to end an AirPlay session.
+  # The splash helper, restarting shairport-sync to end an AirPlay session,
+  # and the settings panel's power row.
   if install_file /etc/sudoers.d/picast 440 <<EOF
 $APP_USER ALL=(root) NOPASSWD: /usr/local/sbin/picast-plymouth-update
 $APP_USER ALL=(root) NOPASSWD: /usr/bin/systemctl restart shairport-sync
+$APP_USER ALL=(root) NOPASSWD: /usr/bin/systemctl poweroff
 EOF
   then
     sudo visudo -cf /etc/sudoers.d/picast >/dev/null \

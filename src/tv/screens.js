@@ -370,16 +370,24 @@ export const PANEL_ROWS = [
   { key: 'sponsorBlock', label: 'rowSponsors' },
   { key: 'clock24', label: 'rowClock' },
   { key: 'cecSwitchInput', label: 'rowSwitchInput' },
+  // An action, not a setting: OK twice.
+  { key: 'power', label: 'rowPower' },
 ];
 
-function panelValue(t, key, s) {
+function panelValue(t, key, s, powerConfirm) {
+  if (key === 'power') return powerConfirm ? t.tr('powerConfirm') : '';
   if (key === 'language') return `‹ ${LANGUAGES[s.language]?.label ?? s.language} ›`;
   if (key === 'clock24') return s.clock24 ? '24h' : '12h';
   return s[key] ? t.tr('on') : t.tr('off');
 }
 
-/** Settings panel on the right; `swatches` = [{ id, hex }], `focus` = row index. */
-export function settingsPanel(t, { settings, focus, swatches }) {
+/**
+ * Settings panel on the right; `swatches` = [{ id, hex }], `focus` = row index,
+ * `powerConfirm` while the power row waits for its second OK.
+ */
+export function settingsPanel(t, {
+  settings, focus, swatches, powerConfirm = false,
+}) {
   const x = W - 60 - 930;
   const y = 60;
   const w = 930;
@@ -391,9 +399,9 @@ export function settingsPanel(t, { settings, focus, swatches }) {
     text(t.tr('settings'), { x: inner, y: y + 50, px: 54, weight: 600, color: t.text }),
   ];
 
-  let rowY = y + 150;
-  const ROW_H = 78;
-  const GAP = 10;
+  let rowY = y + 140;
+  const ROW_H = 68;
+  const GAP = 8;
   PANEL_ROWS.forEach((row, i) => {
     const focused = i === focus;
     const isAccent = row.key === 'accent';
@@ -415,7 +423,9 @@ export function settingsPanel(t, { settings, focus, swatches }) {
       const mid = rowY + rowH / 2;
       events.push(
         text(t.tr(row.label), { x: inner + 36, y: mid, an: 4, px: 36, weight: focused ? 600 : 400, color: t.text }),
-        text(panelValue(t, row.key, settings), { x: inner + innerW - 36, y: mid, an: 6, px: 36, color: focused ? t.text : t.muted }),
+        text(panelValue(t, row.key, settings, powerConfirm), {
+          x: inner + innerW - 36, y: mid, an: 6, px: 36, color: row.key === 'power' ? t.accent : focused ? t.text : t.muted,
+        }),
       );
     }
     rowY += rowH + GAP;

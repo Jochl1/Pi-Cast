@@ -72,6 +72,11 @@ export const scenes = {
     layers: (t) => [screens.home(t, { ...homeState, panelOpen: true }),
       screens.settingsPanel(t, { settings: base, focus: 2, swatches })],
   },
+  'settings-power': {
+    settings: de,
+    layers: (t) => [screens.home(t, { ...homeState, panelOpen: true }),
+      screens.settingsPanel(t, { settings: de, focus: screens.PANEL_ROWS.length - 1, swatches, powerConfirm: true })],
+  },
   toast: { settings: base, video: true, layers: (t) => [screens.toast(t, toastText)] },
   'key-toast': { settings: base, video: true, layers: (t) => [screens.toast(t, 'Trymacs', '#FF5D5D')] },
   'home-night-icons': {
