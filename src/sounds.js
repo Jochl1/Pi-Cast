@@ -6,7 +6,7 @@ import { ROOT } from './config.js';
 
 const SOUNDS_DIR = path.join(ROOT, 'assets', 'sounds');
 const HELPER = path.join(ROOT, 'bin', 'sounds.py');
-// The startup sound only plays when the app starts this soon after boot.
+// The startup sound only plays at boot if the home screen shows this soon after it.
 const BOOT_WINDOW_S = 300;
 const REPLY_TIMEOUT_MS = 2000;
 
@@ -30,7 +30,7 @@ export default class Sounds {
     this.busy = null; // the open/close in flight
     this.replies = [];
     this.endsAt = 0; // when the sound playing now ends
-    this.startupPending = os.uptime() < BOOT_WINDOW_S;
+    this.startupPending = false;
     this.disabled = process.platform === 'win32' || !fs.existsSync(HELPER);
   }
 
@@ -51,6 +51,11 @@ export default class Sounds {
     this.#write(`play ${file}`);
     // 48 kHz stereo 16-bit, minus the 44-byte header.
     this.endsAt = Date.now() + ((fs.statSync(file).size - 44) / 192000) * 1000;
+  }
+
+  /** The home screen is up for the first time: the startup sound, if that's right after boot. */
+  booted() {
+    if (os.uptime() < BOOT_WINDOW_S) this.startup();
   }
 
   /** Plays the startup sound as soon as the device is free (e.g. when the TV comes back on). */

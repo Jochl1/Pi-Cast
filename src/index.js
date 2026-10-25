@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { loadConfig, DATA_DIR } from './config.js';
@@ -254,6 +255,25 @@ settings.on('change', (values, changed) => {
 if (settings.get().cecEnabled) cec.start();
 
 // --- Start ---
+/**
+ * The boot splash stays up until mpv is about to take the screen (with no
+ * gap, as the TV would show black). picast.service is Type=notify and ordered
+ * before plymouth-quit, so telling systemd we're ready lets Plymouth go; mpv
+ * then starts once the display is free.
+ */
+async function endSplash() {
+  if (!process.env.NOTIFY_SOCKET) return; // not under systemd, or not at boot
+  await new Promise((resolve) => {
+    execFile('systemd-notify', ['--ready'], (e) => {
+      if (e) log.warn('telling systemd we are ready failed:', e.message);
+      resolve();
+    });
+  });
+  for (let i = 0; i < 100 && fs.existsSync('/run/plymouth/pid'); i++) await new Promise((r) => setTimeout(r, 100));
+}
+await endSplash();
+// Splash, then the startup sound, then the home screen.
+playback.once('backdrop', () => sounds.booted());
 // Doesn't wait for mpv: it retries in the background if it can't start.
 mpv.start();
 ytdl.start();

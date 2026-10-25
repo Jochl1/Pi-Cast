@@ -153,8 +153,13 @@ install_services() {
 Description=Pi-Cast receiver
 Wants=network-online.target
 After=network-online.target sound.target
+# The boot splash stays until Pi-Cast is ready to draw (it says so with sd_notify).
+Before=plymouth-quit.service plymouth-quit-wait.service
 
 [Service]
+Type=notify
+NotifyAccess=all
+TimeoutStartSec=180
 User=$APP_USER
 WorkingDirectory=$REPO
 ExecStart=/usr/bin/node src/index.js

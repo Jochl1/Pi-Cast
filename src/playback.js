@@ -79,7 +79,11 @@ export default class Playback extends EventEmitter {
       if (this.source) this.emit('loaded');
     });
     mpv.on('playback-restart', () => {
-      if (!this.loading || this.background.showing) return;
+      if (this.background.showing) {
+        this.emit('backdrop'); // its first frame is on screen
+        return;
+      }
+      if (!this.loading) return;
       this.#mark('first frame');
       this.#setLoading(false);
       this.emit('started');
