@@ -1,5 +1,6 @@
 import { ACCENTS, KEY_COLORS, TWITCH_QUALITIES, themeFor } from '/shared/theme.js';
 import { LANGUAGES, translator } from '/shared/i18n.js';
+import { createGames, playerToken } from '/games.js';
 
 const $ = (id) => document.getElementById(id);
 const SOURCE_LABEL = { youtube: 'YouTube', twitch: 'Twitch', instagram: 'Instagram' };
@@ -21,9 +22,11 @@ const state = {
 
 async function api(method, path, body) {
   try {
+    const headers = body ? { 'Content-Type': 'application/json' } : {};
+    if (playerToken()) headers['X-Player'] = playerToken(); // game night
     const res = await fetch(path, {
       method,
-      headers: body ? { 'Content-Type': 'application/json' } : {},
+      headers,
       body: body ? JSON.stringify(body) : undefined,
     });
     const data = await res.json().catch(() => ({}));
@@ -47,8 +50,12 @@ function toast(message) {
 
 // ---------- Live updates ----------
 
+let es = null;
 function connect() {
-  const es = new EventSource('/api/events');
+  es?.close();
+  // As a game night player, the server sends this phone its own view.
+  const player = playerToken();
+  es = new EventSource(player ? `/api/events?player=${encodeURIComponent(player)}` : '/api/events');
   es.addEventListener('open', () => setConnected(true));
   es.addEventListener('error', () => setConnected(false)); // EventSource reconnects by itself
   es.addEventListener('status', (e) => {
@@ -71,6 +78,7 @@ function connect() {
     if (before?.busy && !state.instagram.busy && state.instagram.error) toast(tr(`igErr_${state.instagram.error}`));
     renderInstagram();
   });
+  es.addEventListener('party', (e) => games.update(JSON.parse(e.data)));
 }
 
 function setConnected(on) {
@@ -377,6 +385,7 @@ function applyLanguage(lang) {
   renderStatus();
   renderRecent();
   renderInstagram();
+  games.render();
 }
 
 function renderSettings() {
@@ -466,14 +475,17 @@ function bindInstagram() {
 function route() {
   const section = location.hash === '#instagram' ? $('instagram') : null;
   const settings = location.hash === '#settings' || !!section;
-  $('remote').hidden = settings;
+  const gamesView = location.hash === '#games';
+  $('remote').hidden = settings || gamesView;
   $('settings').hidden = !settings;
+  $('games').hidden = !gamesView;
   if (section) section.scrollIntoView();
   else window.scrollTo(0, 0);
 }
 
 // ---------- Start ----------
 
+const games = createGames({ api, getTr: () => tr, reconnect: connect });
 buildSettings();
 bindRemote();
 bindInstagram();

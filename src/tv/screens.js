@@ -438,17 +438,18 @@ export function settingsPanel(t, {
 }
 
 /** Short message at the bottom centre, e.g. playback errors; `dot` = color of a leading dot. */
-export function toast(t, message, dot = null) {
+export function toast(t, message, dot = null, { top = false } = {}) {
   const label = escape(fit(message, 39, 1400));
   const lead = dot ? 24 + 24 : 0;
   const w = textWidth(label, 39, 0.56) + 108 + lead;
   const h = 114;
   const x = W / 2 - w / 2;
+  const y = top ? 36 : H - 120 - h;
   const events = [
-    rect(x, H - 120 - h, w, h, { color: t.glass, radius: Math.min(t.pill * 3, h / 2), border: 3, borderColor: t.line }),
-    text(label, { x: W / 2 + lead / 2, y: H - 120 - h / 2, an: 5, px: 39, color: t.text }),
+    rect(x, y, w, h, { color: t.glass, radius: Math.min(t.pill * 3, h / 2), border: 3, borderColor: t.line }),
+    text(label, { x: W / 2 + lead / 2, y: y + h / 2, an: 5, px: 39, color: t.text }),
   ];
-  if (dot) events.push(circle(x + 54 + 12, H - 120 - h / 2, 12, { color: dot }));
+  if (dot) events.push(circle(x + 54 + 12, y + h / 2, 12, { color: dot }));
   return events;
 }
 

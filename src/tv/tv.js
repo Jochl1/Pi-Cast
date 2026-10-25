@@ -5,6 +5,7 @@ import { networkStatus } from '../network.js';
 import { coverBgra, thumbnailBgra } from './thumbnail.js';
 import { backgroundClip, backgroundPng } from './background.js';
 import * as screens from './screens.js';
+import * as gameScreens from './games.js';
 
 // osd-overlay ids; higher z draws on top. The thumbnail is an overlay-add
 // bitmap, which mpv always draws above all of these.
@@ -19,6 +20,10 @@ const LAYERS = {
   toast: { id: 6, z: 9 },
 };
 const THUMB_OVERLAY = 0;
+const qrModules = (url) => {
+  const { modules } = QRCode.create(url, { errorCorrectionLevel: 'M' });
+  return Array.from({ length: modules.size }, (_, r) => Array.from({ length: modules.size }, (_, c) => !!modules.get(r, c)));
+};
 const POPUP_MS = 5000;
 const FADE_MS = 600;
 const TOAST_MS = 5000;
@@ -42,10 +47,10 @@ const HISTORY = 30;
  */
 export default class Tv {
   constructor({
-    mpv, playback, cast, settings, sounds, reels, weather, instagram, airplay, twitchLive, log, remote, powerOff,
+    mpv, playback, cast, settings, sounds, reels, weather, instagram, airplay, twitchLive, party, log, remote, powerOff,
   }) {
     Object.assign(this, {
-      mpv, playback, cast, settings, sounds, reels, weather, instagram, airplay, twitchLive, log, remote, powerOff,
+      mpv, playback, cast, settings, sounds, reels, weather, instagram, airplay, twitchLive, party, log, remote, powerOff,
     });
     this.cover = { image: null, want: null }; // AirPlay's cover: the image and its bitmap
     this.sent = {};
@@ -62,8 +67,9 @@ export default class Tv {
     this.dotsTimer = null;
     this.bufferingSince = null;
     // The web remote's address as a QR code on the home screen.
-    const { modules } = QRCode.create(`http://${remote}`, { errorCorrectionLevel: 'M' });
-    this.qr = Array.from({ length: modules.size }, (_, r) => Array.from({ length: modules.size }, (_, c) => !!modules.get(r, c)));
+    this.qr = qrModules(`http://${remote}`);
+    // Game night's: it opens the web app's games view.
+    this.gamesQr = qrModules(`http://${remote}/#games`);
   }
 
   start() {
@@ -93,6 +99,7 @@ export default class Tv {
     });
     cast.on('change', () => this.render());
     this.reels.on('change', () => this.render());
+    this.party.on('change', () => this.render());
     this.weather.on('change', () => this.render());
     this.twitchLive.on('change', () => this.render());
     // The ▲ Instagram hint shows while logged in.
@@ -112,11 +119,13 @@ export default class Tv {
     this.render();
   }
 
-  /** 'home' | 'loading' | 'buffering' | 'playing' | 'paused' | 'reels' | 'airplay' */
+  /** 'home' | 'loading' | 'buffering' | 'playing' | 'paused' | 'reels' | 'games' | 'airplay' */
   screen() {
     const p = this.mpv.props;
     const { source, loading, background } = this.playback;
     if (this.reels.active) return 'reels';
+    // Game night stays open under a video and comes back after it; AirPlay music plays on under it.
+    if (!source && this.party.active) return 'games';
     if (!source) return this.airplay.state.active ? 'airplay' : 'home';
     if (p['idle-active'] || background.showing || loading) return 'loading';
     if (p.pause) return 'paused';
@@ -308,7 +317,7 @@ export default class Tv {
 
     // The home screen's backdrop is mpv's own background color: a full-screen
     // overlay would take half of the Pi 3's overlay texture (see screens.js).
-    await this.#setBackground(onHome || ['loading', 'reels', 'airplay'].includes(screen) ? t.bg : '#000000');
+    await this.#setBackground(onHome || ['loading', 'reels', 'games', 'airplay'].includes(screen) ? t.bg : '#000000');
     this.#updateBackdrop();
     // AirPlay's progress redraws every second, so its backdrop holds still like the panel's.
     if (screen === 'airplay') this.playback.holdBackground('airplay', true);
@@ -347,6 +356,7 @@ export default class Tv {
         item: { ...air, position: Math.min(position, air.duration || position) },
       });
     }
+    if (screen === 'games') layers.home = gameScreens.games(t, this.party.view(), this.gamesQr);
     const popup = [];
     if (this.card) {
       popup.push(...screens.nowPlaying(t, {
@@ -376,7 +386,8 @@ export default class Tv {
         })),
       });
     }
-    if (this.message) layers.toast = screens.toast(t, this.message.text, this.message.dot);
+    // On game night the board fills the bottom, so toasts go to the top.
+    if (this.message) layers.toast = screens.toast(t, this.message.text, this.message.dot, { top: screen === 'games' });
 
     for (const [name, events] of Object.entries(layers)) {
       await this.#send(name, events ? events.join('\n') : null);

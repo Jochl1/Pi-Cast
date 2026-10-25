@@ -5,6 +5,7 @@ An ad-free "Chromecast" for a Raspberry Pi 3. It shows up as a cast target in th
 - **YouTube:** cast from the YouTube app. Videos are fetched directly with yt-dlp, so YouTube ads never play. Sponsor segments are skipped with SponsorBlock.
 - **Twitch and other links:** paste them into the web app, or use Share → **Send to Pi-Cast**. streamlink filters out Twitch's ad breaks.
 - **Music over AirPlay:** pick pi-cast as the AirPlay speaker in Spotify, Apple Music or any app on the iPhone. The TV shows the cover, title and progress.
+- **Game night:** Vier gewinnt (Connect Four) and Tic-Tac-Toe on the TV, played from your phones: scan the QR code on the TV (▼ on the home screen) or tap the games button in the web app. Play against each other or against pi·cast at five levels.
 - **Instagram Reels:** scroll through the Reels tab on the TV with the remote's arrow keys and like with OK. Use a second account: this goes through Instagram's private app API, which Instagram doesn't allow, so the account can get locked.
 - **TV:** animated boot splash, a home screen with a clock, now-playing pop-ups, a pause screen and a settings panel. Soft menu sounds and an optional startup sound. No Linux text on screen.
 
@@ -97,10 +98,12 @@ TV remote keys:
 |---|---|---|---|---|
 | OK | open settings | change value | play / pause | like / unlike |
 | ◀ ▶ | | change value | −10 s / +10 s | −5 s / +5 s |
-| ▲ ▼ | ▲ opens Instagram Reels | move between rows | | previous / next Reel |
+| ▲ ▼ | ▲ opens Instagram Reels, ▼ opens game night | move between rows | | previous / next Reel |
 | Back | | close | stop | back to home (AirPlay: end it) |
 | Play, Pause, Stop, ⏪ ⏩ | | | what they say | what they say |
 | Red, green, yellow, blue | play that key's favourite | play that key's favourite | switch to that key's favourite | switch to that key's favourite |
+
+On game night the remote does the host's lobby jobs: ◀ ▶ pick a game, OK start it (and play again after a round), Back leaves (during a game, press it twice to end the game). The moves themselves are made on the phones.
 
 The colour-key favourites are set in the web app under Settings → Colour keys (red is Trymacs and green is BigSpin by default). The home screen lists them above the divider; a Twitch favourite that's live right now gets a red LIVE tag. Number keys would have been nicer, but the DYON TV doesn't send them over CEC.
 

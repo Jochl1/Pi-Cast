@@ -6,6 +6,8 @@
 import QRCode from 'qrcode';
 import { ACCENTS } from '../src/shared/theme.js';
 import * as screens from '../src/tv/screens.js';
+import * as gameScreens from '../src/tv/games.js';
+import Party from '../src/games/party.js';
 
 const base = { accent: 'violet', customAccent: '#A898FF', clock24: true, bootAnimation: true, sponsorBlock: true, cecSwitchInput: true };
 function qrModules(url) {
@@ -41,6 +43,45 @@ const reel = {
   likes: 48213,
   liked: false,
 };
+// Game night: a real Party, played into the states to show.
+function party(build) {
+  const p = new Party({ log: { info() {}, warn() {}, debug() {} } });
+  build(p);
+  clearTimeout(p.botTimer); // no computer moves in a preview
+  return p.view();
+}
+const gamesQr = qrModules('http://pi-cast.local:8080/#games');
+const lobbyView = party((p) => {
+  p.join(null, { name: 'Johann' });
+  p.join(null, { name: 'Lea' });
+  p.addBot(null);
+});
+const c4Moves = [3, 3, 2, 4, 2, 2, 4, 1, 1];
+const c4View = party((p) => {
+  const a = p.join(null, { name: 'Johann' }).token;
+  const b = p.join(null, { name: 'Lea' }).token;
+  p.start(null);
+  c4Moves.forEach((col, i) => p.move(i % 2 ? b : a, { col }));
+  p.point(b, 4);
+});
+const c4WonView = party((p) => {
+  const a = p.join(null, { name: 'Johann' }).token;
+  const b = p.join(null, { name: 'Maximilian' }).token;
+  p.start(null);
+  [0, 6, 1, 6, 2, 5, 3].forEach((col, i) => p.move(i % 2 ? b : a, { col }));
+});
+const tttWonView = party((p) => {
+  const { id } = p.join(null, { name: 'Johann' });
+  p.addBot(null);
+  p.select(null, 'tictactoe');
+  p.start(null);
+  // ✕ won on the diagonal.
+  p.game.state = {
+    cells: [0, 1, null, 1, 0, null, null, null, 0], turn: 1, last: 8, line: [0, 4, 8], over: true, winner: 0,
+  };
+  p.wins = { tictactoe: { [id]: 3 } };
+});
+
 const swatches = Object.entries(ACCENTS).map(([id, a]) => ({ id, hex: a.hex, selected: id === 'violet' }));
 
 export const scenes = {
@@ -146,4 +187,18 @@ export const scenes = {
     layers: (t) => [screens.home(t, { ...homeState, panelOpen: true }),
       screens.settingsPanel(t, { settings: base, focus: 0, swatches }), screens.toast(t, toastText)],
   },
+  'games-lobby': { settings: de, layers: (t) => [gameScreens.games(t, lobbyView, gamesQr)] },
+  'games-lobby-full-en': {
+    settings: base,
+    layers: (t) => [gameScreens.games(t, party((p) => {
+      ['Johann', 'Lea', 'Maximilian', 'Sophie', 'Ben'].forEach((name) => p.join(null, { name }));
+      p.addBot(null);
+    }), gamesQr), screens.toast(t, toastText, null, { top: true })],
+  },
+  'games-connect4': { settings: de, layers: (t) => [gameScreens.games(t, c4View, gamesQr)] },
+  'games-connect4-won+toast': {
+    settings: de,
+    layers: (t) => [gameScreens.games(t, c4WonView, gamesQr), screens.toast(t, t.tr('gamesBackAgain'), null, { top: true })],
+  },
+  'games-tictactoe-won': { settings: de, layers: (t) => [gameScreens.games(t, tttWonView, gamesQr)] },
 };

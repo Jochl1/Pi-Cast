@@ -29,6 +29,8 @@
 }
 
 * { box-sizing: border-box; }
+/* `hidden` wins over classes that set display. */
+[hidden] { display: none !important; }
 
 html { background: var(--bg); }
 
@@ -241,6 +243,71 @@ input[type="range"] { flex-grow: 1; accent-color: var(--accent); height: 28px; }
 .ig-session[open] summary { margin-bottom: 10px; }
 .ig-session .hint { margin-bottom: 10px; }
 .hint { margin: 0; font-size: 13px; line-height: 1.5; color: var(--muted); }
+
+/* --- Game night --- */
+.accent-btn.wide { width: 100%; height: 52px; border-radius: var(--pill); font-size: 16px; }
+.ghost-btn {
+  width: 100%; height: 48px; border: 0; border-radius: var(--pill);
+  background: var(--surface); color: var(--text); font-size: 15px; font-weight: 600;
+}
+.hint.center { text-align: center; }
+.hint:empty { display: none; }
+.g-colors { grid-template-columns: repeat(6, minmax(0, 1fr)); margin: 6px 0; }
+.g-colors .swatch:disabled { opacity: 0.2; }
+.g-players { display: flex; flex-direction: column; gap: 10px; }
+.g-players .player { display: flex; align-items: center; gap: 12px; }
+.p-name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.p-name small { display: block; font-weight: 400; font-size: 12px; color: var(--muted); }
+.avatar {
+  width: 40px; height: 40px; flex: none; border-radius: 50%; display: grid; place-items: center;
+  font-weight: 700; color: var(--on-accent);
+}
+.avatar.bot { background: #15132A; border: 2px solid var(--accent); color: var(--text); font-weight: 600; font-size: 13px; }
+.level { border: 0; border-radius: var(--pill); background: var(--surface); padding: 6px 10px; font-size: 13px; }
+.g-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.game {
+  padding: 14px 12px; border-radius: 18px; border: 2px solid transparent; background: var(--surface);
+  text-align: left; font-weight: 600; font-size: 14px;
+}
+.game small { display: block; margin-top: 2px; font-weight: 400; font-size: 12px; color: var(--muted); }
+.game[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.game:disabled { opacity: 1; cursor: default; }
+.game:disabled:not([aria-pressed="true"]) { opacity: 0.6; }
+.g-status {
+  display: flex; align-items: center; gap: 10px; padding: 14px; border-radius: var(--radius);
+  background: var(--surface); font-weight: 600;
+}
+.g-status.mine { box-shadow: inset 0 0 0 2px var(--accent); }
+.dot { width: 16px; height: 16px; flex: none; border-radius: 50%; display: inline-block; }
+.g-score { display: flex; gap: 10px; }
+.score {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px;
+  border-radius: var(--radius); background: var(--surface); font-size: 14px; min-width: 0;
+}
+.score b { margin-left: 4px; }
+.g-bottom { display: flex; justify-content: center; gap: 16px; }
+.g-bottom .text-btn { margin: 0; }
+
+.board-connect4 {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; padding: 10px;
+  border-radius: 22px; background: var(--surface);
+}
+.board-connect4 .cell { aspect-ratio: 1; border: 0; padding: 0; border-radius: 50%; background: rgba(10, 9, 18, 0.85); }
+.board-connect4 .cell:disabled { opacity: 1; cursor: default; }
+.board-connect4 .cell.col:not(.filled) { background: color-mix(in srgb, var(--accent) 35%, rgba(10, 9, 18, 0.85)); }
+.board-tictactoe { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.board-tictactoe .cell {
+  aspect-ratio: 1; border: 0; border-radius: 18px; background: var(--surface);
+  display: grid; place-items: center;
+}
+.board-tictactoe .cell:disabled { opacity: 1; cursor: default; }
+.mark-o { width: 54%; aspect-ratio: 1; border-radius: 50%; border: 11px solid var(--c); }
+.mark-x { width: 56%; aspect-ratio: 1; position: relative; }
+.mark-x::before, .mark-x::after {
+  content: ''; position: absolute; left: -10%; top: 41%; width: 120%; height: 18%; border-radius: 6px;
+  background: var(--c); transform: rotate(45deg);
+}
+.mark-x::after { transform: rotate(-45deg); }
 
 /* --- Toast --- */
 .toast {

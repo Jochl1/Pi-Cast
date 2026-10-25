@@ -9,7 +9,7 @@ const ICON_SIZES = [180, 192, 512];
 
 /** Web app + JSON API. Live state goes out over SSE at /api/events. */
 export default function createWebServer({
-  playback, controls, settings, recent, events, remoteKey, instagram, findPlace, getStatus, getTheme, log,
+  playback, controls, settings, recent, events, remoteKey, instagram, party, findPlace, getStatus, getTheme, log,
 }) {
   const app = express();
   app.disable('x-powered-by');
@@ -69,6 +69,20 @@ export default function createWebServer({
 
   // Same keys as the TV remote; handy for testing without HDMI-CEC.
   app.post('/api/tv/key', action(({ key }) => ({ ok: true, handled: remoteKey(String(key)) })));
+
+  // Game night. Phones send their player token (from join) in X-Player; the
+  // party's state arrives over SSE ('party'), each phone with its own view.
+  // Never null: that's the TV remote, which may do what the host does.
+  const player = (req) => req.get('X-Player') || '';
+  app.post('/api/party/join', action(({ name, color }, req) => party.join(player(req), { name, color })));
+  app.post('/api/party/leave', action((body, req) => party.leave(player(req))));
+  app.post('/api/party/close', action((body, req) => party.closeBy(player(req))));
+  app.post('/api/party/bot', action(({ id, level }, req) => (id ? party.setBot(player(req), id, level ?? null) : party.addBot(player(req), level))));
+  app.post('/api/party/select', action(({ game }, req) => party.select(player(req), game)));
+  app.post('/api/party/start', action((body, req) => party.start(player(req))));
+  app.post('/api/party/end', action((body, req) => party.endGame(player(req))));
+  app.post('/api/party/move', action(({ action: move }, req) => party.move(player(req), move)));
+  app.post('/api/party/point', action(({ value }, req) => party.point(player(req), value)));
 
   // Instagram login. The outcome arrives over SSE ('instagram'), since a login
   // can wait minutes for the security code.

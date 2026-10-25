@@ -9,6 +9,7 @@ import Streamlink from './streamlink.js';
 import Ytdl from './ytdl.js';
 import Instagram from './instagram.js';
 import Reels from './reels.js';
+import Party from './games/party.js';
 import Weather, { findPlace } from './weather.js';
 import AirPlay from './airplay.js';
 import TwitchLive from './twitchLive.js';
@@ -53,6 +54,7 @@ const controls = createControls({ playback, cast, mpv });
 const reels = new Reels({
   instagram, playback, controls, log,
 });
+const party = new Party({ log });
 
 function lanAddress() {
   const all = Object.values(os.networkInterfaces()).flat()
@@ -79,9 +81,17 @@ function pushStatus() {
     events.send('status', getStatus());
   }, 150);
 }
-events.setSnapshot(() => ({
-  status: getStatus(), settings: settings.get(), recent: recent.list(), instagram: instagram.state,
+events.setSnapshot((player) => ({
+  status: getStatus(), settings: settings.get(), recent: recent.list(), instagram: instagram.state, party: party.viewFor(player),
 }));
+// Each phone gets its own view of the game night (who they are).
+let partyTimer = null;
+party.on('change', () => {
+  partyTimer ??= setTimeout(() => {
+    partyTimer = null;
+    events.sendEach('party', (player) => party.viewFor(player));
+  }, 30);
+});
 instagram.on('change', (state) => events.send('instagram', state));
 // The polled time-pos only matters while something plays (the backdrop ticks too).
 mpv.on('property', (name) => {
@@ -186,11 +196,13 @@ function powerOff() {
   }, 1500);
 }
 const tv = new Tv({
-  mpv, playback, cast, settings, sounds, reels, weather, instagram, airplay, twitchLive, log,
+  mpv, playback, cast, settings, sounds, reels, weather, instagram, airplay, twitchLive, party, log,
   remote: `${os.hostname()}.local:${config.webPort}`, powerOff,
 });
 tv.start();
 reels.on('toast', (key, sound) => tv.toast(translator(settings.get().language)(key), { sound }));
+party.on('toast', (key) => tv.toast(translator(settings.get().language)(key)));
+party.on('sound', (name) => sounds.play(name));
 
 // Keeps the Plymouth boot splash in the current accent.
 new BootSplash({ settings, log });
@@ -233,14 +245,18 @@ function remoteKey(key) {
     playShortcut(key);
     return true;
   }
-  // Reels, then the settings panel (and OK on the home screen) come first.
-  if (reels.key(key) || tv.key(key)) return true;
+  // Reels, game night, then the settings panel (and OK on the home screen) come first.
+  if (reels.key(key) || (tv.screen() === 'games' && party.key(key)) || tv.key(key)) return true;
   if (tv.screen() === 'airplay' && (key === 'back' || key === 'stop')) {
     airplay.release();
     return true;
   }
   if (key === 'up' && tv.screen() === 'home') {
     reels.open().catch((e) => log.warn('opening Reels failed:', e.message));
+    return true;
+  }
+  if (key === 'down' && tv.screen() === 'home') {
+    party.open();
     return true;
   }
   if (!playback.source || !REMOTE_ACTIONS[key]) return false;
@@ -313,7 +329,7 @@ setTimeout(startWorkers, 30000).unref();
 await cast.start(settings.get().deviceName);
 
 const web = createWebServer({
-  playback, controls, settings, recent, events, remoteKey, instagram, findPlace, getStatus, getTheme, log,
+  playback, controls, settings, recent, events, remoteKey, instagram, party, findPlace, getStatus, getTheme, log,
 });
 web.listen(config.webPort, () => {
   log.info(`Pi-Cast "${settings.get().deviceName}" ready — web app at http://${lanAddress()}:${config.webPort}`);
