@@ -46,7 +46,12 @@ export default class Ytdl {
     const proc = spawn(PYTHON, [WORKER, 'worker', this.config.ytdlFormat], { stdio: ['pipe', 'pipe', 'pipe'] });
     this.proc = proc;
     readline.createInterface({ input: proc.stdout }).on('line', (line) => this.#onLine(line));
-    proc.stderr.on('data', (d) => this.log.debug('[yt-dlp]', d.toString().trim()));
+    proc.stderr.on('data', (d) => {
+      const msg = d.toString().trim();
+      // The background warm-up (see bin/ytdl.py) is worth seeing in the log.
+      if (/challenge solver/.test(msg)) this.log.info('[yt-dlp]', msg);
+      else this.log.debug('[yt-dlp]', msg);
+    });
     proc.on('error', (e) => this.log.warn('yt-dlp worker failed to start:', e.message));
     proc.on('exit', (code, signal) => {
       if (this.proc === proc) this.proc = null;

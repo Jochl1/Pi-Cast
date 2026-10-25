@@ -12,7 +12,10 @@ If yt-dlp changes its internals, this quietly runs plain yt-dlp.
                               JSON reply per line on stdout. Saves Python's
                               start-up (~6 s on a Pi 3) on every video.
                               It also keeps one Node running for the JS
-                              challenges (bin/jsc.js), which saves 4-5 s more.
+                              challenges (bin/jsc.js), which saves 4-5 s more,
+                              and has it compile the newest cached player
+                              in the background, so the first video after
+                              a restart doesn't wait for that either.
 """
 import hashlib
 import inspect
@@ -21,10 +24,22 @@ import os
 import select
 import subprocess
 import sys
+import threading
+import urllib.parse
 
 JSC = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'jsc.js')
 # Parsing a new raw player takes ~20 s at 600 MHz.
 SOLVE_TIMEOUT = 90
+
+
+def cached_players():
+    """yt-dlp's cached preprocessed players, newest first."""
+    from yt_dlp.extractor.youtube.jsc._builtin import ejs
+    # yt-dlp's default cache dir (we never pass --cache-dir).
+    base = os.environ.get('XDG_CACHE_HOME') or os.path.expanduser('~/.cache')
+    d = os.path.join(base, 'yt-dlp', ejs.EJSBaseJCP._CACHE_SECTION)
+    return sorted((e for e in os.scandir(d) if e.name.startswith('player')),
+                  key=lambda e: e.stat().st_mtime, reverse=True)
 
 
 def enable_player_cache():
@@ -33,12 +48,7 @@ def enable_player_cache():
         if not hasattr(ejs.EJSBaseJCP, '_ENABLE_PREPROCESSED_PLAYER_CACHE'):
             return
         ejs.EJSBaseJCP._ENABLE_PREPROCESSED_PLAYER_CACHE = True
-        # yt-dlp's default cache dir (we never pass --cache-dir).
-        base = os.environ.get('XDG_CACHE_HOME') or os.path.expanduser('~/.cache')
-        d = os.path.join(base, 'yt-dlp', ejs.EJSBaseJCP._CACHE_SECTION)
-        players = sorted((e for e in os.scandir(d) if e.name.startswith('player')),
-                         key=lambda e: e.stat().st_mtime, reverse=True)
-        for e in players[2:]:
+        for e in cached_players()[2:]:
             os.remove(e.path)
     except Exception:
         pass
@@ -50,8 +60,13 @@ class WarmSolver:
     def __init__(self):
         self.proc = None
         self.keys = set()  # players this jsc.js has
+        self.lock = threading.Lock()  # the warm-up runs on its own thread
 
     def solve(self, jcp, player, preprocessed, requests):
+        with self.lock:
+            return self._solve(jcp, player, preprocessed, requests)
+
+    def _solve(self, jcp, player, preprocessed, requests):
         if not self.proc or self.proc.poll() is not None:
             self.start(jcp)
         key = hashlib.sha1(player.encode()).hexdigest()
@@ -117,6 +132,39 @@ def enable_warm_solver():
 
     NodeJCP._construct_stdin = warm_construct
     NodeJCP._run_js_runtime = warm_run
+    return solver
+
+
+def warm_up(ydl, solver, prepared):
+    """Compiles the newest cached player in jsc.js, as the first video would.
+
+    Sets `prepared` once yt-dlp's side is set up (the main thread waits for
+    that before it extracts); the compile then runs in Node while the first
+    request, if one comes, does its network requests. Does nothing without
+    a cached player."""
+    try:
+        from yt_dlp.extractor.youtube.jsc._builtin import ejs
+        from yt_dlp.extractor.youtube.jsc._builtin.node import NodeJCP
+        players = cached_players()
+        if not players:
+            return
+        # Cache file names are the quoted key with % as ','.
+        key = urllib.parse.unquote(players[0].name.removesuffix('.json').replace(',', '%'))
+        player = ydl.cache.load(ejs.EJSBaseJCP._CACHE_SECTION, key)
+        ie = ydl.get_info_extractor('Youtube')
+        ie.initialize()
+        jcp = next((p for p in ie._jsc_director.providers.values() if isinstance(p, NodeJCP)), None)
+        if not player or not jcp or not jcp.is_available():
+            return
+        jcp._lib_script, jcp._core_script  # loaded here rather than on the first video
+        with solver.lock:
+            prepared.set()
+            solver._solve(jcp, player, True, [])
+        print('warmed up the challenge solver', file=sys.stderr, flush=True)
+    except Exception as e:
+        print(f'warming up the challenge solver failed: {e}', file=sys.stderr, flush=True)
+    finally:
+        prepared.set()
 
 
 class StderrLogger:
@@ -155,7 +203,7 @@ def resolve(ydl, url):
     }
 
 
-def worker(fmt):
+def worker(fmt, solver):
     from yt_dlp import YoutubeDL
     out = sys.stdout
     sys.stdout = sys.stderr  # nothing but replies on the real stdout
@@ -170,9 +218,15 @@ def worker(fmt):
     })
     out.write(json.dumps({'ready': True}) + '\n')
     out.flush()
+    prepared = threading.Event()
+    if solver:
+        threading.Thread(target=warm_up, args=(ydl, solver, prepared), daemon=True).start()
+    else:
+        prepared.set()
     for line in sys.stdin:
         if not line.strip():
             continue
+        prepared.wait()
         req = json.loads(line)
         try:
             reply = {'id': req['id'], 'ok': True, **resolve(ydl, req['url'])}
@@ -186,8 +240,7 @@ if __name__ == '__main__':
     mode, args = sys.argv[1], sys.argv[2:]
     enable_player_cache()
     if mode == 'worker':
-        enable_warm_solver()
-        worker(args[0])
+        worker(args[0], enable_warm_solver())
     else:
         import yt_dlp
         sys.argv = ['yt-dlp', *args]

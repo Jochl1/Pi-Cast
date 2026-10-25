@@ -152,7 +152,8 @@ Node 22 (ESM), with `express`, `yt-cast-receiver`, `qrcode` and `chess.js` as th
 - **The warm challenge solver** (`bin/jsc.js`): even the preprocessed player is 4.3 MB of JS, and yt-dlp's fresh Node compiled it again for every video (4–5 s at 600 MHz).
   - The worker patches yt-dlp's Node provider (`_construct_stdin`/`_run_js_runtime`) to send challenges to one Node that stays running. It gets yt-dlp's verified lib and core scripts once and keeps each player's compiled `n`/`sig` functions (the newest two), keyed by a hash of the player. Python sends the player only the first time.
   - Same sandbox flags as yt-dlp's Node (`--permission`). If it fails or times out, that challenge goes through yt-dlp's normal path. If `_real_bulk_solve` no longer passes `_construct_stdin`'s result straight to `_run_js_runtime`, the patch isn't applied.
-  - Measured at 600 MHz over five videos: resolving went from about 9.0 s to about 4.8 s per video. The first video in a fresh worker still compiles the player (about 10 s to resolve). jsc.js uses about 65 MB.
+  - Measured at 600 MHz over five videos: resolving went from about 9.0 s to about 4.8 s per video. jsc.js uses about 65 MB.
+  - **Warm-up:** once the worker is ready, a background thread starts jsc.js and has it compile the newest player in yt-dlp's cache, as the first video would (about 4 s after "worker ready", logged as "warmed up the challenge solver"). A request that comes in meanwhile waits only for yt-dlp's side to be set up (the extractor, the solver scripts) and does its network requests while Node compiles; the solver lock makes its challenge wait for the compile. Without a cached player it does nothing. The worker starts after the home screen, so boot isn't slower. First cast after a restart, at 600 MHz: resolving went from 7.8–9.6 s to 6.1 s, about what later videos take.
   - Some videos (e.g. VEVO ones) get HTTP 403 on their streams with or without it; that's YouTube refusing this client, not the solver.
   - Tried and rejected: clients that need no JS challenge (`android_vr`, `ios`). They need a PO token and only give 360p. Smaller player variants only saved a few seconds.
 - A daily `picast-update.timer` upgrades yt-dlp and streamlink, because YouTube breaks old versions regularly.
@@ -313,7 +314,7 @@ The Pi 3 throttles from 1200 to 600 MHz on undervoltage (`vcgencmd get_throttled
 ## 5. Open work
 
 - **Faster YouTube start.** With the warm solver, resolving is mostly YouTube's network requests (webpage, player APIs, m3u8: 2–4 s).
-  - Options: compile the newest cached player into jsc.js when the worker starts, so the first video after a restart is fast too; resolving the next queued video ahead of time.
+  - Options: resolving the next queued video ahead of time.
   - A proper power supply is likely the biggest single win.
 - **TV black with a signal** happened once, and power-cycling the TV fixed it. If it comes back, test whether CEC is involved by turning it off in the web app.
 
