@@ -223,7 +223,7 @@ function playShortcut(color) {
   tv.toast(shortcut.name, { dot: KEY_COLORS[color] });
   playback.play(shortcut.url, { owner: 'web' }).catch((e) => {
     log.warn(`${color} key: ${e.message}`);
-    tv.toast(tr('couldntPlay'), { sound: 'error' });
+    if (!e.why) tv.toast(tr('couldntPlay'), { sound: 'error' }); // with `why`, 'ended' showed it
   });
 }
 

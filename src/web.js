@@ -2,6 +2,7 @@ import path from 'node:path';
 import express from 'express';
 import { ROOT } from './config.js';
 import { extractUrl } from './sources.js';
+import { translator } from './shared/i18n.js';
 import { iconPng, iconSvg } from './icons.js';
 
 const ICON_SIZES = [180, 192, 512];
@@ -22,7 +23,7 @@ export default function createWebServer({
       res.json(result ?? { ok: true });
     } catch (e) {
       log.warn(`${req.method} ${req.path} failed:`, e.message);
-      res.status(e.status ?? 500).json({ ok: false, error: e.message });
+      res.status(e.status ?? 500).json({ ok: false, error: e.message, ...(e.why && { why: e.why }) });
     }
   };
 
@@ -49,7 +50,7 @@ export default function createWebServer({
       await playback.play(target, { owner: 'web' });
       res.redirect('/');
     } catch (e) {
-      res.redirect('/?error=' + encodeURIComponent(e.message));
+      res.redirect('/?error=' + encodeURIComponent(e.why ? translator(settings.get().language)(e.why) : e.message));
     }
   });
 

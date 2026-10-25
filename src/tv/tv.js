@@ -84,8 +84,8 @@ export default class Tv {
     });
     playback.on('started', () => this.#onStarted());
     playback.on('change', () => this.render());
-    playback.on('ended', ({ reason }) => {
-      if (reason === 'error') this.toast(screens.look(this.settings.get()).tr('couldntPlay'), { sound: 'error' });
+    playback.on('ended', ({ reason, why }) => {
+      if (reason === 'error') this.toast(screens.look(this.settings.get()).tr(why ?? 'couldntPlay'), { sound: 'error' });
     });
     cast.on('senderConnect', (name) => {
       this.sender = { name, until: Date.now() + POPUP_MS };

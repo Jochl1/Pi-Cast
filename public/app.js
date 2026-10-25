@@ -27,7 +27,7 @@ async function api(method, path, body) {
       body: body ? JSON.stringify(body) : undefined,
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+    if (!res.ok) throw new Error(data.why ? tr(data.why) : data.error || `Request failed (${res.status})`);
     return data;
   } catch (e) {
     toast(e.message === 'Failed to fetch' ? tr('cantReach') : e.message);

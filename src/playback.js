@@ -21,7 +21,8 @@ const seamless = (file) => (file.endsWith('.mp4') ? repeated(file) : file);
  *
  * Events:
  *  'takeover' (previousOwner) - someone else started playing
- *  'ended' ({ owner, reason }) - the current item finished ('eof') or failed ('error')
+ *  'ended' ({ owner, reason, why }) - the current item finished ('eof') or failed
+ *     ('error'); `why` is an i18n key when yt-dlp said why (e.g. age-restricted)
  *  'started' - the first frame of a new item is on screen
  *  'change' - owner, source, metadata or loading changed
  *  'play' ({ owner, url, kind }) - a new item was requested
@@ -264,6 +265,10 @@ export default class Playback extends EventEmitter {
       // Don't leave the previous item playing unowned.
       if (!this.source) await this.#toIdle();
       await this.streamlink.close();
+      if (e.why && !this.source) {
+        this.log.warn(`couldn't play ${url}: ${e.message}`);
+        this.emit('ended', { owner, reason: 'error', why: e.why });
+      }
       throw e;
     }
   }
@@ -275,6 +280,7 @@ export default class Playback extends EventEmitter {
       this.#mark('resolved');
       return direct;
     } catch (e) {
+      if (e.why) throw e;
       this.log.warn(`yt-dlp worker: ${e.message}; letting mpv resolve ${url}`);
       return null;
     }

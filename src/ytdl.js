@@ -9,12 +9,20 @@ const PYTHON = path.join(ROOT, '.venv', 'bin', 'python');
 const TIMEOUT_MS = 90000;
 // Stream URLs stay valid for hours; this only covers casting the same video again.
 const CACHE_MS = 20 * 60 * 1000;
+// What the TV says about yt-dlp's errors (i18n keys), the first match wins.
+const FAILURES = [
+  [/confirm your age|age-restricted/i, 'errAgeRestricted'],
+  [/private video/i, 'errPrivate'],
+  [/members-only|join this channel/i, 'errMembersOnly'],
+  [/unavailable|not available|removed/i, 'errUnavailable'],
+];
 
 /**
  * A long-running yt-dlp (bin/ytdl.py worker) that resolves YouTube links to
  * direct stream URLs. Starting yt-dlp costs ~6 s on a Pi 3, which mpv's ytdl
  * hook pays on every video; this pays it once. If the worker can't be used,
- * resolve() rejects and the caller falls back to mpv's hook.
+ * resolve() rejects and the caller falls back to mpv's hook. If yt-dlp itself
+ * fails, the error has `why`, an i18n key for the TV (e.g. age-restricted).
  *
  * Resolves to { title, duration, live, height, video: { url, headers }, audio }.
  */
@@ -93,8 +101,11 @@ export default class Ytdl {
     const p = this.pending.get(msg.id);
     if (!p) return;
     this.pending.delete(msg.id);
-    if (msg.ok) p.resolve(msg);
-    else p.reject(new Error(msg.error));
+    if (msg.ok) return p.resolve(msg);
+    // yt-dlp's own answer: mpv's ytdl hook runs the same yt-dlp and would fail
+    // the same way, so `why` tells the caller not to retry there.
+    const why = FAILURES.find(([re]) => re.test(msg.error))?.[1] ?? 'couldntPlay';
+    p.reject(Object.assign(new Error(msg.error), { why }));
   }
 }
 
