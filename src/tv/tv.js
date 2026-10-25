@@ -14,6 +14,7 @@ const LAYERS = {
   loading: { id: 7, z: 2 },
   dots: { id: 8, z: 3 },
   reels: { id: 9, z: 4 },
+  side: { id: 10, z: 4 }, // a YouTube comment, over the video
   popup: { id: 3, z: 5 },
   pause: { id: 4, z: 6 },
   panel: { id: 5, z: 8 },
@@ -48,9 +49,11 @@ const HISTORY = 30;
 export default class Tv {
   constructor({
     mpv, playback, cast, settings, sounds, reels, weather, instagram, airplay, twitchLive, youtubeLive, party, log, remote, powerOff,
+    ytComments, radio,
   }) {
     Object.assign(this, {
       mpv, playback, cast, settings, sounds, reels, weather, instagram, airplay, twitchLive, youtubeLive, party, log, remote, powerOff,
+      ytComments, radio,
     });
     this.cover = { image: null, want: null }; // AirPlay's cover: the image and its bitmap
     this.sent = {};
@@ -101,6 +104,7 @@ export default class Tv {
     cast.on('change', () => this.render());
     this.reels.on('change', () => this.render());
     this.party.on('change', () => this.render());
+    for (const m of [this.ytComments, this.radio]) m.on('change', () => this.render());
     this.weather.on('change', () => this.render());
     this.twitchLive.on('change', () => this.render());
     this.youtubeLive.on('change', () => this.render());
@@ -121,15 +125,17 @@ export default class Tv {
     this.render();
   }
 
-  /** 'home' | 'loading' | 'buffering' | 'playing' | 'paused' | 'reels' | 'games' | 'airplay' */
+  /** 'home' | 'loading' | 'buffering' | 'playing' | 'paused' | 'reels' | 'games' | 'radioList' | 'radio' | 'airplay' */
   screen() {
     const p = this.mpv.props;
     const { source, loading, background } = this.playback;
     if (this.reels.active) return 'reels';
     // Game night stays open under a video and comes back after it; AirPlay music plays on under it.
     if (!source && this.party.active) return 'games';
+    if (!source && this.radio.active) return 'radioList';
     if (!source) return this.airplay.state.active ? 'airplay' : 'home';
     if (p['idle-active'] || background.showing || loading) return 'loading';
+    if (source.kind === 'radio') return 'radio'; // paused and buffering show on it too
     if (p.pause) return 'paused';
     if (this.bufferingSince && Date.now() - this.bufferingSince >= BUFFERING_MS) return 'buffering';
     return 'playing';
@@ -239,6 +245,7 @@ export default class Tv {
 
   /** ▲ or seeking while a video plays: the timeline for a few seconds, in place of the card. */
   showTimeline() {
+    this.ytComments.close();
     this.timeline = { until: Date.now() + POPUP_MS };
     this.card = null;
     this.render();
@@ -327,13 +334,17 @@ export default class Tv {
 
     // The home screen's backdrop is mpv's own background color: a full-screen
     // overlay would take half of the Pi 3's overlay texture (see screens.js).
-    await this.#setBackground(onHome || ['loading', 'reels', 'games', 'airplay'].includes(screen) ? t.bg : '#000000');
+    await this.#setBackground(onHome || ['loading', 'reels', 'games', 'radioList', 'radio', 'airplay'].includes(screen) ? t.bg : '#000000');
     this.#updateBackdrop();
-    // AirPlay's progress redraws every second, so its backdrop holds still like the panel's.
+    // AirPlay's progress redraws every second, so its backdrop holds still like the panel's;
+    // the radio grid redraws on every key, like the panel.
     if (screen === 'airplay') this.playback.holdBackground('airplay', true);
+    if (screen === 'radioList') this.playback.holdBackground('radio', true);
+
+    const comments = this.ytComments.open && screen === 'playing';
 
     const layers = {
-      home: null, loading: null, reels: null, popup: null, pause: null, panel: null, toast: null,
+      home: null, loading: null, reels: null, side: null, popup: null, pause: null, panel: null, toast: null,
     };
     const sender = status.owner === 'cast' ? this.cast.senders()[0] : null;
     if (overVideo) {
@@ -367,11 +378,27 @@ export default class Tv {
       });
     }
     if (screen === 'games') layers.home = gameScreens.games(t, this.party.view(), this.gamesQr);
+    if (screen === 'radioList') {
+      layers.home = screens.radioGrid(t, {
+        now: new Date(now), clock24: s.clock24, stations: this.radio.stations, focus: this.radio.focus,
+      });
+    }
+    if (screen === 'radio') {
+      const index = this.radio.playingIndex();
+      const station = index >= 0 ? { ...this.radio.stations[index], index } : { name: status.title ?? 'Radio', tags: status.channel, index: 0 };
+      layers.home = screens.radio(t, { station, song: status.song, paused: !!p.pause });
+    }
+    if (comments) {
+      layers.side = screens.commentCard(t, {
+        comment: this.ytComments.current, index: this.ytComments.index, total: this.ytComments.list?.length ?? 0,
+      });
+    }
     const popup = [];
     // Only over the running video: paused has its own, loading and buffering their card.
-    const timeline = !!this.timeline && screen === 'playing';
+    // The comment card takes the bottom.
+    const timeline = !!this.timeline && screen === 'playing' && !comments;
     if (timeline) popup.push(...screens.timeline(t, status, fade(this.timeline.until)));
-    else if (this.card) {
+    else if (this.card && !comments) {
       popup.push(...screens.nowPlaying(t, {
         ...status, quality: this.card.quality, withThumb: !!status.thumbnail,
       }, fade(this.card.until)));
@@ -402,7 +429,8 @@ export default class Tv {
     // The home screen's key hints, game night's boards and the timeline fill the bottom, so toasts go to the top there
     // (not over the settings panel's title).
     if (this.message) layers.toast = screens.toast(t, this.message.text, this.message.dot, {
-      top: (onHome && !this.panel.open) || screen === 'games' || timeline, narrow: onHome && !this.panel.open,
+      top: (onHome && !this.panel.open) || ['games', 'radioList', 'radio'].includes(screen) || timeline || comments,
+      narrow: onHome && !this.panel.open,
     });
 
     for (const [name, events] of Object.entries(layers)) {
@@ -414,9 +442,11 @@ export default class Tv {
     const unhold = () => {
       if (!this.panel.open) this.playback.holdBackground('panel', false);
       if (this.screen() !== 'airplay') this.playback.holdBackground('airplay', false);
+      if (this.screen() !== 'radioList') this.playback.holdBackground('radio', false);
     };
     if ((!this.panel.open && this.playback.holds.has('panel'))
-      || (screen !== 'airplay' && this.playback.holds.has('airplay'))) {
+      || (screen !== 'airplay' && this.playback.holds.has('airplay'))
+      || (screen !== 'radioList' && this.playback.holds.has('radio'))) {
       this.unholdTimer = setTimeout(unhold, UNHOLD_MS);
     }
     // Reels: the dots sit in the middle, where the next Reel will be.
@@ -525,7 +555,7 @@ export default class Tv {
     const now = new Date();
     const wait = (60 - now.getSeconds()) * 1000 - now.getMilliseconds() + 50;
     setTimeout(() => {
-      if (this.screen() === 'home' || this.screen() === 'airplay') this.render();
+      if (['home', 'airplay', 'radioList'].includes(this.screen())) this.render();
       this.#tickClock();
     }, wait);
   }

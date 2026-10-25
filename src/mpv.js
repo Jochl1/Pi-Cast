@@ -7,8 +7,9 @@ import { ROOT } from './config.js';
 
 // time-pos isn't observed: it changes every frame, which is a lot of IPC
 // traffic for a Pi 3. It's polled once a second during playback instead.
-// current-ao is set while mpv has the audio device open.
-const OBSERVED = ['pause', 'duration', 'volume', 'mute', 'idle-active', 'media-title', 'paused-for-cache', 'current-ao'];
+// current-ao is set while mpv has the audio device open; icy-title is a radio stream's song.
+const ICY = 'metadata/by-key/icy-title';
+const OBSERVED = ['pause', 'duration', 'volume', 'mute', 'idle-active', 'media-title', 'paused-for-cache', 'current-ao', ICY];
 const SCRIPTS_DIR = path.join(ROOT, 'mpv-scripts');
 
 /**
@@ -28,7 +29,7 @@ export default class Mpv extends EventEmitter {
     this.log = log;
     this.props = {
       pause: false, 'time-pos': 0, duration: 0, volume: 100, mute: false,
-      'idle-active': true, 'media-title': null, 'paused-for-cache': false, 'current-ao': null,
+      'idle-active': true, 'media-title': null, 'paused-for-cache': false, 'current-ao': null, [ICY]: null,
     };
     // Awaited before loading anything that may have sound (the UI sounds let go of the device).
     this.beforeLoad = null;
@@ -255,13 +256,17 @@ export default class Mpv extends EventEmitter {
    * `audio`: false for files without sound (the backdrop).
    * Resolves to the new playlist entry's id.
    */
-  async load(url, { start = 0, title = '', headers = [], loop = false, audio = true } = {}) {
+  /** `external`: a file whose video plays along (a radio stream over the backdrop). */
+  async load(url, {
+    start = 0, title = '', headers = [], loop = false, audio = true, external = null,
+  } = {}) {
     if (audio) await this.beforeLoad?.();
     // These are global options, so reset them on every load.
     await this.set('start', start > 0 ? String(start) : 'none');
     await this.set('force-media-title', title);
     await this.set('http-header-fields', headers);
     await this.set('loop-file', loop ? 'inf' : 'no');
+    await this.set('external-files', external ? [external] : []);
     await this.set('speed', 1);
     await this.set('pause', false);
     const result = await this.command('loadfile', url, 'replace');

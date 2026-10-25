@@ -157,9 +157,45 @@ const chessMateView = party((p) => {
   chessPlay(p, ['e4', 'e5', 'Bc4', 'Nc6', 'Qh5', 'Nf6', 'Qxf7#']);
 });
 
+const comments = [
+  { author: '@maxbaut', ago: 'vor 2 Tagen', likes: '4202', text: 'Wer hätte gedacht, dass ein Raspberry Pi das alles schafft. Bau ich am Wochenende nach.' },
+  { author: '@a.very.long.channel.name.that.goes.on', ago: '3 years ago (edited)', likes: '427,408', text: 'This is a really long comment that keeps going and going so that it needs more than three lines on the TV, which means the end of it has to be cut off with an ellipsis somewhere around here, or maybe a bit later than that, it depends on the font and the width of the card.' },
+];
+const stations = [
+  { name: '1LIVE', tags: 'pop, rock' }, { name: 'SWR3', tags: 'pop, rock' }, { name: 'FM4', tags: 'alternative, electronic' },
+  { name: 'Deutschlandfunk', tags: 'news, culture' }, { name: 'bigFM', tags: 'charts, hip-hop' }, { name: 'Radio BOB!', tags: 'rock' },
+  { name: 'Klassik Radio', tags: 'classical' }, { name: 'Lofi Radio', tags: 'lofi, chill' },
+];
 const swatches = Object.entries(ACCENTS).map(([id, a]) => ({ id, hex: a.hex, selected: id === 'violet' }));
 
 export const scenes = {
+  comment: {
+    settings: de, video: true,
+    layers: (t) => [screens.commentCard(t, { comment: comments[0], index: 0, total: 20 })],
+  },
+  'comment-long+toast-top': {
+    settings: base, video: true,
+    layers: (t) => [screens.commentCard(t, { comment: comments[1], index: 4, total: 20 }), screens.toast(t, toastText, null, { top: true })],
+  },
+  'comment-loading': { settings: de, video: true, layers: (t) => [screens.commentCard(t, { comment: null, index: 0, total: 0 })] },
+  'radio-grid': {
+    settings: de,
+    layers: (t) => [screens.radioGrid(t, { now, clock24: true, stations, focus: 0 })],
+  },
+  'radio-grid-scrolled+toast': {
+    settings: base,
+    layers: (t) => [screens.radioGrid(t, { now, clock24: false, stations: [...stations, ...stations.slice(0, 3)], focus: 9 }), screens.toast(t, toastText, null, { top: true })],
+  },
+  'radio-empty': { settings: de, layers: (t) => [screens.radioGrid(t, { now, clock24: true, stations: [], focus: 0 })] },
+  radio: {
+    settings: de,
+    layers: (t) => [screens.radio(t, { station: { ...stations[0], index: 0 }, song: 'Die Beispiele - Ein Lied über den Herbst', paused: false })],
+  },
+  'radio-long-paused+toast': {
+    settings: base,
+    layers: (t) => [screens.radio(t, { station: { name: 'Deutschlandfunk Kultur', tags: 'culture, news', index: 3 }, song: 'Ein sehr langer Titel einer Sendung ohne Trennstrich und mit vielen Wörtern', paused: true }),
+      screens.toast(t, 'Lautstärke 45', null, { top: true })],
+  },
   home: { settings: base, layers: (t) => [screens.home(t, homeState)] },
   'home-12h-amber': {
     settings: { ...base, accent: 'amber' },

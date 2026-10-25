@@ -14,6 +14,8 @@ import Weather, { findPlace } from './weather.js';
 import AirPlay from './airplay.js';
 import TwitchLive from './twitchLive.js';
 import YoutubeLive from './youtubeLive.js';
+import YtComments from './ytComments.js';
+import Radio from './radio.js';
 import Playback from './playback.js';
 import Cast from './cast.js';
 import Settings, { streamlinkQuality } from './settings.js';
@@ -185,6 +187,12 @@ const twitchLive = new TwitchLive({ settings, playback, log });
 twitchLive.start();
 const youtubeLive = new YoutubeLive({ settings, playback, log });
 youtubeLive.start();
+const ytComments = new YtComments({ playback, settings, sounds, log });
+// A paused video shows its own screen; the comment card would sit on it.
+mpv.on('property', (name, value) => {
+  if (name === 'pause' && value) ytComments.close();
+});
+const radio = new Radio({ settings, playback, sounds, log });
 /**
  * The settings panel's power row. A Pi 3 only starts again when its power is
  * reconnected. The toast shows for a moment first; systemd then stops Pi-Cast
@@ -200,12 +208,13 @@ function powerOff() {
 }
 const tv = new Tv({
   mpv, playback, cast, settings, sounds, reels, weather, instagram, airplay, twitchLive, youtubeLive, party, log,
-  remote: `${os.hostname()}.local:${config.webPort}`, powerOff,
+  ytComments, radio, remote: `${os.hostname()}.local:${config.webPort}`, powerOff,
 });
 tv.start();
 reels.on('toast', (key, sound) => tv.toast(translator(settings.get().language)(key), { sound }));
 party.on('toast', (key) => tv.toast(translator(settings.get().language)(key)));
 party.on('sound', (name) => sounds.play(name));
+ytComments.on('empty', () => tv.toast(translator(settings.get().language)('commentsNone'), { sound: 'error' }));
 
 // Keeps the Plymouth boot splash in the current accent.
 new BootSplash({ settings, log });
@@ -249,8 +258,8 @@ function remoteKey(key) {
     playShortcut(key);
     return true;
   }
-  // Reels, game night, then the settings panel (and OK on the home screen) come first.
-  if (reels.key(key) || (tv.screen() === 'games' && party.key(key)) || tv.key(key)) return true;
+  // Reels, game night, the radio grid, then the settings panel (and OK on the home screen) come first.
+  if (reels.key(key) || (tv.screen() === 'games' && party.key(key)) || radio.key(key) || tv.key(key)) return true;
   if (tv.screen() === 'airplay' && (key === 'back' || key === 'stop')) {
     airplay.release();
     return true;
@@ -263,6 +272,26 @@ function remoteKey(key) {
     party.open();
     return true;
   }
+  if (key === 'left' && tv.screen() === 'home') {
+    radio.open();
+    return true;
+  }
+  const screen = tv.screen();
+  // A station: ◀ ▶ switch stations, ▲ ▼ the volume; OK and Back as for videos.
+  if (screen === 'radio') {
+    if (key === 'left' || key === 'right') {
+      radio.step(key === 'left' ? -1 : 1);
+      return true;
+    }
+    if (key === 'up' || key === 'down') {
+      const level = Math.max(0, Math.min(100, Math.round((mpv.props.volume ?? 100) / 5) * 5 + (key === 'up' ? 5 : -5)));
+      controls.setVolume({ level }).catch((e) => log.debug('volume failed:', e.message));
+      tv.toast(translator(settings.get().language)('volumeToast', { level }));
+      return true;
+    }
+  }
+  // ▼ over a YouTube video: its comments, one at a time.
+  if ((screen === 'playing' || ytComments.open) && ytComments.key(key)) return true;
   // ▲ over a running video: the timeline; seeking shows it too.
   if (key === 'up' && tv.screen() === 'playing') {
     tv.showTimeline();
@@ -340,7 +369,7 @@ setTimeout(startWorkers, 30000).unref();
 await cast.start(settings.get().deviceName);
 
 const web = createWebServer({
-  playback, controls, settings, recent, events, remoteKey, instagram, party, findPlace, getStatus, getTheme, log,
+  playback, controls, settings, recent, events, remoteKey, instagram, party, radio, findPlace, getStatus, getTheme, log,
 });
 web.listen(config.webPort, () => {
   log.info(`Pi-Cast "${settings.get().deviceName}" ready — web app at http://${lanAddress()}:${config.webPort}`);

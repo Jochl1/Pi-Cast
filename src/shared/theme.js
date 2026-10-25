@@ -31,6 +31,9 @@ export const KEY_COLORS = { red: '#FF5D5D', green: '#4BE3B0', yellow: '#FFC247',
 /** Game night: the players' colours, in the order they're handed out. */
 export const PLAYER_COLORS = ['#FF7A59', '#FFC247', '#6FA8FF', '#4BE3B0', '#FF7EB6', '#B6F25A'];
 
+/** Radio station tiles, by the station's place in the list (TV and web app). */
+export const STATION_COLORS = ['#FFC247', '#FF7A59', '#6FA8FF', '#4BE3B0', '#FF7EB6', '#FF5D5D', '#E6ECF2', '#A898FF'];
+
 export const TWITCH_QUALITIES = ['1080p60', '720p60', '720p', '480p'];
 
 export const isHex = (v) => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);

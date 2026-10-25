@@ -1,4 +1,6 @@
-import { ACCENTS, KEY_COLORS, TWITCH_QUALITIES, themeFor } from '/shared/theme.js';
+import {
+  ACCENTS, KEY_COLORS, STATION_COLORS, TWITCH_QUALITIES, themeFor,
+} from '/shared/theme.js';
 import { LANGUAGES, translator } from '/shared/i18n.js';
 import { createGames, playerToken } from '/games.js';
 
@@ -347,6 +349,13 @@ function buildSettings() {
   });
   place.addEventListener('keydown', (e) => { if (e.key === 'Enter') place.blur(); });
 
+  const query = $('radio-query');
+  $('radio-search').addEventListener('submit', (e) => {
+    e.preventDefault();
+    query.blur();
+    searchStations(query.value.trim());
+  });
+
   const language = $('language');
   language.replaceChildren(...Object.entries(LANGUAGES).map(([id, l]) => new Option(l.label, id)));
   language.addEventListener('change', () => change({ language: language.value }));
@@ -370,6 +379,68 @@ function saveShortcut(color, name, link) {
   if (link && !/^https?:\/\//i.test(link)) link = `https://${link}`;
   const shortcut = link ? { name: (name.trim() || nameFor(link)).slice(0, 30), url: link } : null;
   change({ shortcuts: { ...state.settings.shortcuts, [color]: shortcut } });
+}
+
+// ---------- Radio stations ----------
+
+const MAX_STATIONS = 24;
+let stationResults = [];
+
+/** A station's row: its tile (as on the TV), name and genres, and one button. */
+function stationRow(station, i, label, onClick) {
+  const row = document.createElement('div');
+  row.className = 'station';
+  const tile = document.createElement('span');
+  tile.className = 'station-tile';
+  tile.style.background = STATION_COLORS[i % STATION_COLORS.length];
+  tile.textContent = station.name.slice(0, 1).toUpperCase();
+  const text = document.createElement('div');
+  text.className = 'station-text';
+  const name = document.createElement('span');
+  name.textContent = station.name;
+  text.append(name);
+  if (station.tags) {
+    const tags = document.createElement('span');
+    tags.textContent = station.tags;
+    text.append(tags);
+  }
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'text-btn';
+  button.textContent = label;
+  button.addEventListener('click', onClick);
+  row.append(tile, text, button);
+  return row;
+}
+
+function renderStations() {
+  const list = state.settings?.radioStations ?? [];
+  $('stations').replaceChildren(...list.map((st, i) => stationRow(st, i, tr('radioRemove'), () => {
+    change({ radioStations: list.filter((_, n) => n !== i) });
+  })));
+  $('stations').hidden = !list.length;
+  const saved = new Set(list.map((st) => st.url));
+  const results = stationResults.filter((st) => !saved.has(st.url));
+  $('radio-results').replaceChildren(...results.map((st) => stationRow(st, list.length, tr('radioAdd'), () => {
+    const now = state.settings.radioStations;
+    if (now.length >= MAX_STATIONS) return toast(tr('radioFull'));
+    change({ radioStations: [...now, { name: st.name, url: st.url, tags: st.tags }] });
+  })));
+  $('radio-results').hidden = !results.length;
+}
+
+async function searchStations(q) {
+  if (!q) {
+    stationResults = [];
+    renderStations();
+    return;
+  }
+  try {
+    const { stations } = await api('GET', `/api/radio/search?q=${encodeURIComponent(q)}`);
+    stationResults = stations;
+    if (!stations.length) toast(tr('radioNoResults'));
+  } catch { /* toast shown */ }
+  renderStations();
 }
 
 /** Puts every fixed text in the current language; the rest is rendered with tr(). */
@@ -411,6 +482,7 @@ function renderSettings() {
   }
   $('language').value = s.language;
   $('language-value').textContent = LANGUAGES[s.language]?.label ?? s.language;
+  renderStations();
 }
 
 // ---------- Instagram ----------

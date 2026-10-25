@@ -9,7 +9,7 @@ const ICON_SIZES = [180, 192, 512];
 
 /** Web app + JSON API. Live state goes out over SSE at /api/events. */
 export default function createWebServer({
-  playback, controls, settings, recent, events, remoteKey, instagram, party, findPlace, getStatus, getTheme, log,
+  playback, controls, settings, recent, events, remoteKey, instagram, party, radio, findPlace, getStatus, getTheme, log,
 }) {
   const app = express();
   app.disable('x-powered-by');
@@ -103,6 +103,13 @@ export default function createWebServer({
     if (name && !place) return { ok: false, notFound: true };
     await settings.update({ weatherPlace: place });
     return { ok: true, place };
+  }));
+
+  // Radio: stations to add, from radio-browser.info; the list itself is a setting.
+  app.get('/api/radio/search', action(async (body, req) => {
+    const query = String(req.query.q ?? '').trim().slice(0, 80);
+    if (!query) throw badRequest('Missing query');
+    return { stations: await radio.search(query) };
   }));
 
   // Icons follow the current accent.

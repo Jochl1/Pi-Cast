@@ -107,6 +107,8 @@ Node 22 (ESM), with `express`, `yt-cast-receiver`, `qrcode` and `chess.js` as th
 | `reels.js` | Reels on the TV: the list, scrolling, likes, keys. |
 | `airplay.js` | AirPlay state and metadata from shairport-sync's pipe; ends a session. |
 | `youtubeLive.js` | Which YouTube favourites are live streams on air, for the same pill: a video link (`/live/<id>`, `watch?v=`, `youtu.be`) is one POST to YouTube's web player API (`youtubei/v1/player`, no key, ~5 KB back; `videoDetails.isLive` is there even when it wants a PO token for the streams), a channel's `/live` link (`@name/live`, …) one fetch of that page (~220 KB compressed) for `"isLiveNow":true`. Same schedule as Twitch; about 1 s for one favourite on the Pi. A failed check keeps the last state. |
+| `radio.js` | Radio on ◀ from the home screen: the station grid (keys, focus), playing and switching stations, the station search for the web app (radio-browser.info, free, no key). The saved stations are the `radioStations` setting (up to 24). A station plays as mpv's file with the backdrop clip as its picture (`external-files`, 480 repeats = 4 h, then the last frame stays), so the colours keep drifting behind the radio screen; the song comes from the stream's ICY metadata (`metadata/by-key/icy-title`). Starts in about 1.5–2 s. |
+| `ytComments.js` | YouTube comments on ▼ over a video: two POSTs to YouTube's web `youtubei/v1/next` (no key): the watch page's data has a continuation token for the comment section, the second request returns the top 20 (`commentEntityPayload`). About 1.5 s from a PC, 3 s on the Pi, so they're fetched 8 s after the first frame, ahead of ▼. |
 | `twitchLive.js` | Which Twitch favourites are live: one GQL query (Twitch's public web client ID, as streamlink uses) for all of them every 3 min and when the TV wakes up, skipped in standby. |
 | `games/party.js` | Game night: players (a secret token per phone), host, computer players, seats, turns, wins, the TV remote's keys; `view()` for the TV, `viewFor(token)` per phone. |
 | `games/connect4.js`, `games/tictactoe.js`, `games/eins.js` | Rules modules: `create`, `turn`, `move` (throws on an illegal move), `bot` (negamax with alpha-beta / full minimax / Eins! heuristics; lower levels make random mistakes, `games/levels.js`). Eins! also has `public` (counts, top cards) and `private` (a player's hand and playable cards), so hands never leave the server except to their phone. |
@@ -313,6 +315,18 @@ The Pi 3 throttles from 1200 to 600 MHz on undervoltage (`vcgencmd get_throttled
 - The sounds helper grabs the device in any gap (it holds it whenever nothing plays), even between two AirPlay songs, so it has to know about other programs (see AirPlay).
 - shairport-sync's default volume curve turns a third of the phone's volume into −43 dB, which is nearly silent on a TV.
 
+### 4.6 Overlays over 60 fps video
+
+Measured on 2026-10-25 during a 720p60 Twitch stream, with the Pi throttled (600 MHz ARM, 250 MHz core), for a Twitch chat column (dropped, see §5). mpv draws its overlays on the draw plane again for **every video frame**, so what an overlay costs is paid 60 times a second. Without an overlay mpv takes about 30% CPU and drops nothing.
+
+- **ASS overlays cost per frame, roughly by area and by the number of text events.** A 540×972 glass rectangle alone: +50% CPU, a few drops. Twelve chat lines (no glass): +70%, 1–2% of frames dropped. Both together (the chat column, design A): mpv at 120% CPU and **324 of 900 frames dropped** (≈38 fps). Six short lines in a 466 px tall glass: still 2% dropped. The timeline card (§3) drops about 1% too, and the now-playing card a few frames.
+- At **30 fps** (480p30) the full chat column dropped nothing. The user wants at least 720p, and many Twitch channels only have 720p60 above 480p30.
+- **Moving the video aside** (`video-margin-ratio-right`/`-bottom`, e.g. 0 left and 520 px right for a 1400 px wide video at the top left) works in overlay mode: mpv moves the video plane and it costs nothing.
+- **One static `overlay-add` bitmap costs almost nothing**: 440×972 or 440×972 plus 1400×292, 0 drops, +5–10% CPU.
+- **Updating a bitmap stalls the video.** Each `overlay-add` of a new 1.7 MB BGRA file costs about 30 ms in mpv; 16 updates dropped 5 frames. Drawing the chat with Pillow (`bin/bitmap.py`, on the experiment branch) took 525 ms per frame on the throttled Pi. In the app, the chat bitmap updated every 1.2 s dropped 34–53 frames in 20 s, every 4 s still 28, and even with no updates at all 23 (unexplained: the same static bitmaps from a test script dropped none).
+- Conclusion: nothing that changes every second or two can sit on screen during 60 fps video on this Pi as it is. A proper power supply (1.2 GHz, 400 MHz core) might change that; measure again before trying.
+- Measuring: mpv's `frame-drop-count` before and after a fixed time, and mpv's CPU from `/proc/<pid>/stat` (utime + stime).
+
 ## 5. Open work
 
 - **Faster YouTube start.** With the warm solver, resolving is mostly YouTube's network requests (webpage, player APIs, m3u8: 2–4 s).
@@ -321,6 +335,9 @@ The Pi 3 throttles from 1200 to 600 MHz on undervoltage (`vcgencmd get_throttled
 - **TV black with a signal** happened once, and power-cycling the TV fixed it. If it comes back, test whether CEC is involved by turning it off in the web app.
 
 - **Instagram:** fetching the next Reel's video ahead (key to first frame is now a fresh HTTP open). A QR code on the TV that opens the web app's `#instagram` when nobody is logged in. Feed posts and Stories besides Reels.
+
+- **Twitch chat (dropped on 2026-10-25).** Anonymous read-only chat over `wss://irc-ws.chat.twitch.tv` (`NICK justinfan<number>`, `CAP REQ :twitch.tv/tags` for names and colours) works with no account. Designs: A, a glass column over the video (cost: §4.6, far too much); B, the video moved to the top left with the chat beside it and the channel under it, chosen by the user, as overlay-add bitmaps: still 1–4% of frames dropped at 720p60. The code is on the local branch `experiment/twitch-chat` (`src/twitchChat.js`, `src/tv/bitmaps.js`, `bin/bitmap.py`, design B layout in `screens.js`). Try again after the power supply is fixed. Note: Sora has no ▲▼◀▶; Pillow can't fall back to another font, so the bitmap draws the arrow as a shape.
+- **The living-room lamp.** The user's smart bulb (label "SAMSON 3000k OP3731", no packaging, nothing found online) isn't on the Wi-Fi (no Tuya broadcasts on 6666/6667/7000, no WiZ reply on 38899, no setup network). The user thinks it may still be looking for an old Wi-Fi network. A Bluetooth scan from the Pi found "MELK-OA10   43" (`BE:69:08:34:5F:01`, a common ELK-BLEDOM-type controller), which vanished when the lamp was switched off but didn't come back when it was on again; gatttool couldn't connect. A second watch saw neither it nor "Sunset lights" (`FF:10:10:A3:63:90`, a neighbour's?) change with the lamp. Next: reset the bulb (off/on about 5 times until it blinks) and look for its setup network or a new BLE name. Bluetooth on the Pi is soft-blocked by default (`/sys/class/rfkill/rfkill0/soft`); scanning shares the radio with Wi-Fi, so only while nothing plays. Stop `hcitool lescan` with SIGINT (`timeout -s INT`), or the next scan fails.
 
 ### Ideas for later (from the user, not designed yet)
 

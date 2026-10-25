@@ -1,7 +1,7 @@
-import { themeFor } from '../shared/theme.js';
+import { STATION_COLORS, themeFor } from '../shared/theme.js';
 import { LANGUAGES, translator } from '../shared/i18n.js';
 import {
-  text, span, paint, rect, circle, shape, arcBand, escape, fit, textWidth, qrShape,
+  text, span, paint, rect, circle, shape, arcBand, polygon, escape, fit, textWidth, qrShape,
 } from './ass.js';
 import { weatherIcon, weatherKind } from './weatherIcons.js';
 import { measure } from './measure.js';
@@ -26,7 +26,7 @@ const PAD_X = 96;
 const PAD_Y = 84;
 // Colors used over video, from the design.
 const ON_VIDEO = { text: '#F2F4F7', muted: '#B4BCC8', track: 'rgba(255,255,255,0.2)', dim: 'rgba(6,8,12,0.62)' };
-const SOURCE = { youtube: 'YouTube', twitch: 'Twitch', instagram: 'Instagram' };
+const SOURCE = { youtube: 'YouTube', twitch: 'Twitch', instagram: 'Instagram', radio: 'Radio' };
 const source = (t, kind) => SOURCE[kind] ?? t.tr('link');
 
 /** Colors and texts for `settings`: themeFor() plus tr (see i18n.js). */
@@ -210,8 +210,8 @@ function keyHints(t, keys, instagram) {
     }
     x += 48;
   }
-  // On the right: what ▲ and ▼ open.
-  const opens = [instagram && ['▲', t.tr('homeInstagram')], ['▼', t.tr('homeGames')]].filter(Boolean);
+  // On the right: what ◀, ▲ and ▼ open.
+  const opens = [['◀', t.tr('homeRadio')], instagram && ['▲', t.tr('homeInstagram')], ['▼', t.tr('homeGames')]].filter(Boolean);
   events.push(text(opens.map(([k, label]) => `{${paint(t.text)}}${k} {${paint(t.muted)}}${escape(label)}`).join('      '), {
     x: W - PAD_X, y, an: 6, px: 30, weight: 600, color: t.text,
   }));
@@ -525,6 +525,12 @@ const plain = (s) => String(s ?? '')
   .trim();
 
 /** Splits text into at most `maxLines` lines of roughly `maxW` px; the last one ends in … if cut. */
+/** The average character width of `s` in the font, as a share of `px`, a little generous; for wrap(). */
+function avgWidth(s, px, weight = 400) {
+  const w = measure(s, px, { weight });
+  return w && s.length ? (w / (s.length * px)) * 1.06 : 0.56;
+}
+
 function wrap(s, px, maxW, maxLines, avg = 0.52) {
   const max = Math.max(8, Math.floor(maxW / (px * avg)));
   const lines = [];
@@ -650,5 +656,183 @@ export function airplay(t, { now, clock24, item }) {
       text(fmtTime(item.duration), { x: PAD_X + barW, y: 926, an: 9, px: 27, font: 'JetBrains Mono', weight: 500, color: t.muted }),
     );
   }
+  return events;
+}
+
+// --- YouTube comments over the video ---
+
+/** A small filled thumbs-up, 28 px, top left at (x, y). */
+function thumbUp(x, y, color) {
+  return [
+    rect(x, y + 12, 7, 16, { color, radius: 2 }),
+    rect(x + 9, y + 12, 19, 16, { color, radius: 4 }),
+    polygon([[x + 9, y + 13], [x + 15, y], [x + 20, y + 2], [x + 19, y + 13]], { color }),
+  ];
+}
+
+/**
+ * One YouTube comment in a glass card at the bottom (▼ over a video):
+ * author, age and likes, the comment in up to three lines, and "3 / 20"
+ * with the keys. `comment` = { author, text, likes, ago }, or null while
+ * they load.
+ */
+export function commentCard(t, { comment, index, total }) {
+  const x = 54;
+  const w = W - 108;
+  const inner = x + 60;
+  const innerW = w - 120;
+  const body = comment ? plain(comment.text) : '';
+  const lines = body ? wrap(body, 40, innerW, 3, avgWidth(body, 40)) : [];
+  const h = 194 + Math.max(1, lines.length) * 56;
+  const y = H - 54 - h;
+  const events = [rect(x, y, w, h, { color: t.glass, radius: t.radius * 3 })];
+  const headY = y + 44 + 20;
+  if (!comment) {
+    events.push(text(t.tr('commentsLoading'), { x: inner, y: headY + 58, an: 4, px: 40, color: ON_VIDEO.muted }));
+  } else {
+    const author = fit(plain(comment.author), 30, innerW / 2, 0.56);
+    const authorW = measure(author, 30, { weight: 600 }) ?? textWidth(author, 30, 0.6);
+    events.push(
+      text(escape(author), { x: inner, y: headY, an: 4, px: 30, weight: 600, color: t.accent }),
+      text(escape(fit(comment.ago, 30, innerW / 3)), { x: inner + authorW + 18, y: headY, an: 4, px: 30, color: ON_VIDEO.muted }),
+    );
+    if (comment.likes) {
+      const likes = escape(comment.likes);
+      events.push(
+        text(likes, { x: inner + innerW, y: headY, an: 6, px: 30, font: 'JetBrains Mono', weight: 500, color: ON_VIDEO.muted }),
+        ...thumbUp(inner + innerW - textWidth(likes, 30, 0.6) - 18 - 28, headY - 15, ON_VIDEO.muted),
+      );
+    }
+    lines.forEach((line, i) => events.push(text(escape(line), { x: inner, y: headY + 38 + i * 56, px: 40, color: ON_VIDEO.text })));
+  }
+  const footY = y + h - 40;
+  if (total) events.push(text(`${index + 1} / ${total}`, { x: inner, y: footY, an: 1, px: 26, font: 'JetBrains Mono', weight: 500, color: ON_VIDEO.muted }));
+  events.push(text(t.tr('commentsKeys'), { x: inner + innerW, y: footY, an: 3, px: 26, color: ON_VIDEO.muted }));
+  return events;
+}
+
+// --- Radio ---
+
+/** A station's tile colour, by its place in the list. */
+export const stationColor = (i) => STATION_COLORS[i % STATION_COLORS.length];
+
+/**
+ * Up to three letters for a station's tile: "Klassik Radio" → KR, "FM4" → FM4,
+ * "SWR3" → S3, "1LIVE" → 1L, "bigFM" → FM, "Deutschlandfunk" → D.
+ */
+export function stationInitials(name) {
+  const words = plain(name).replace(/[^\p{L}\p{N} ]/gu, '').split(' ').filter(Boolean);
+  if (!words.length) return '?';
+  if (words.length > 1) return words.slice(0, 2).map((word) => word[0].toUpperCase()).join('');
+  const [word] = words;
+  if (word.length <= 3) return word;
+  const digits = /\d+$/.exec(word);
+  if (digits && digits.index > 0) return word[0].toUpperCase() + digits[0].slice(0, 2);
+  const caps = word.match(/[\p{Lu}\d]/gu) ?? [];
+  return caps.length >= 2 ? caps.slice(0, 2).join('') : word[0].toUpperCase();
+}
+
+/** Hints along the bottom: [key, label] pairs on the left, `right` text on the right. */
+function keyRow(t, pairs, right, y = H - 64) {
+  const events = [text(pairs.map(([k, label]) => `{${paint(t.text)}}${escape(k)} {${paint(t.muted)}}${escape(label)}`).join('      '), {
+    x: PAD_X, y, an: 1, px: 26, weight: 600, color: t.text,
+  })];
+  if (right) events.push(text(escape(right), { x: W - PAD_X, y, an: 3, px: 26, color: t.muted }));
+  return events;
+}
+
+const RADIO_COLS = 4;
+const RADIO_TILE = { top: 196, w: 408, h: 268, gap: 32 };
+
+/**
+ * The radio grid (◀ on the home screen) over the backdrop: four tiles to a
+ * row, two rows at a time, scrolled to the focused one.
+ * `stations` = [{ name, tags }], `focus` = index.
+ */
+export function radioGrid(t, { now, clock24, stations, focus }) {
+  const c = clockParts(now, clock24, t.tr.locale);
+  const titleW = measure(t.tr('radioTitle'), 64, { weight: 600 }) ?? textWidth(t.tr('radioTitle'), 64, 0.6);
+  const events = [
+    text(t.tr('radioTitle'), { x: PAD_X, y: 72 + 64, an: 1, px: 64, weight: 600, color: t.text }),
+    text(t.tr('radioSub'), { x: PAD_X + titleW + 24, y: 72 + 60, an: 1, px: 30, color: t.muted }),
+    text(`${c.time}${c.suffix ? ` ${c.suffix}` : ''}`, { x: W - PAD_X, y: 72 + 60, an: 3, px: 34, font: 'JetBrains Mono', weight: 500, color: t.muted }),
+    ...keyRow(t, [['OK', t.tr('radioKeyPlay')], ['◀ ▲ ▶ ▼', t.tr('radioKeyMove')], [t.tr('reelsKeyBack'), t.tr('reelsKeyHome')]], t.tr('radioAddHint')),
+  ];
+  if (!stations.length) {
+    events.push(text(t.tr('radioEmpty'), { x: W / 2, y: H / 2, an: 5, px: 39, color: t.muted }));
+    return events;
+  }
+  const { top, w, h, gap } = RADIO_TILE;
+  const firstRow = Math.max(0, Math.floor(focus / RADIO_COLS) - 1);
+  stations.slice(firstRow * RADIO_COLS, (firstRow + 2) * RADIO_COLS).forEach((st, n) => {
+    const i = firstRow * RADIO_COLS + n;
+    const x = PAD_X + (n % RADIO_COLS) * (w + gap);
+    const y = top + Math.floor(n / RADIO_COLS) * (h + gap);
+    const focused = i === focus;
+    if (focused) events.push(rect(x - 10, y - 10, w + 20, h + 20, { color: t.accent, opacity: 0, radius: 48, border: 4, borderColor: t.accent }));
+    events.push(
+      rect(x, y, w, h, { color: '#FFFFFF', opacity: focused ? 0.12 : 0.05, radius: 40 }),
+      rect(x + 32, y + 32, 96, 96, { color: stationColor(i), radius: 28 }),
+      text(escape(stationInitials(st.name)), { x: x + 32 + 48, y: y + 32 + 48, an: 5, px: 34, weight: 600, color: '#0A0C10' }),
+      text(escape(fit(plain(st.name), 34, w - 64, 0.56)), { x: x + 32, y: y + h - 32 - 38, an: 1, px: 34, weight: 600, color: t.text }),
+    );
+    if (st.tags) events.push(text(escape(fit(st.tags, 24, w - 64)), { x: x + 32, y: y + h - 32, an: 1, px: 24, color: t.muted }));
+  });
+  return events;
+}
+
+/** "Artist - Title" (ICY metadata) as [artist, title]; one part if there's no dash. */
+function splitSong(song) {
+  const s = plain(song);
+  const i = s.indexOf(' - ');
+  return i > 0 ? [s.slice(0, i), s.slice(i + 3)] : [s, ''];
+}
+
+/**
+ * A station playing, over the backdrop: its tile on the left, LIVE, the
+ * station's name and the song it sends on the right, and the keys.
+ * `station` = { name, tags, index }, `song` = ICY title or null.
+ */
+export function radio(t, { station, song, paused: isPaused }) {
+  const tile = { x: 160, y: 260, size: 560 };
+  const left = tile.x + tile.size + 96;
+  const width = W - 160 - left;
+  const name = plain(station.name);
+  const big = (measure(name, 104, { weight: 600 }) ?? textWidth(name, 104, 0.6)) <= width;
+  const [artist, title] = song ? splitSong(song) : ['', ''];
+  const events = [
+    rect(tile.x, tile.y, tile.size, tile.size, { color: stationColor(station.index ?? 0), radius: 60 }),
+    text(escape(stationInitials(station.name)), { x: tile.x + tile.size / 2, y: tile.y + tile.size / 2, an: 5, px: 180, weight: 600, color: '#0A0C10' }),
+  ];
+  let y = 318;
+  let labelW = 84;
+  if (isPaused) {
+    const label = t.tr('paused').toLocaleUpperCase(t.tr.locale);
+    labelW = measure(label, 24, { weight: 600, spacing: 2 }) ?? textWidth(label, 24, 0.7);
+    events.push(text(label, { x: left, y: y + 17, an: 4, px: 24, weight: 600, spacing: 2, color: t.accent }));
+  } else {
+    events.push(
+      rect(left, y, 84, 34, { color: LIVE_RED, radius: 17 }),
+      text('LIVE', { x: left + 42, y: y + 17, an: 5, px: 22, weight: 600, spacing: 2, color: '#FFFFFF' }),
+    );
+  }
+  const sub = ['Radio', station.tags].filter(Boolean).join(' · ');
+  events.push(text(escape(fit(sub, 30, width - labelW - 20)), { x: left + labelW + 20, y: y + 17, an: 4, px: 30, color: t.muted }));
+  y += 34 + 26;
+  events.push(text(escape(fit(name, big ? 104 : 72, width, 0.56)), { x: left, y, px: big ? 104 : 72, weight: 600, spacing: big ? -2 : -1, color: t.text }));
+  y += (big ? 104 : 72) * 1.15 + 26;
+  if (artist) {
+    events.push(text(escape(fit(artist, 44, width)), { x: left, y, px: 44, color: t.text }));
+    y += 44 * 1.3 + 14;
+  }
+  if (title) {
+    events.push(text(escape(fit(title, 40, width)), { x: left, y, px: 40, color: t.muted }));
+    y += 40 * 1.3;
+  }
+  y += 40;
+  [24, 48, 36, 60, 28, 52, 40, 18, 44, 56, 30, 22].forEach((bh, i) => {
+    events.push(rect(left + i * 22, y + 64 - bh, 12, bh, { color: t.accent, radius: 6, opacity: isPaused ? 0.35 : 1 }));
+  });
+  events.push(...keyRow(t, [['◀ ▶', t.tr('radioSwitch')], ['▲ ▼', t.tr('radioVolume')]], t.tr('radioStops')));
   return events;
 }

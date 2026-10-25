@@ -11,6 +11,12 @@ const shortcutsOk = (v) => isObject(v) && Object.entries(v).every(([color, s]) =
   isObject(s) && typeof s.name === 'string' && s.name.trim().length > 0 && s.name.length <= 30
   && typeof s.url === 'string' && /^https?:\/\/\S+$/i.test(s.url) && s.url.length <= 500)));
 
+/** Up to 24 radio stations: { name, url, tags } (tags: a short genre line, may be empty). */
+const stationsOk = (v) => Array.isArray(v) && v.length <= 24 && v.every((s) => isObject(s)
+  && typeof s.name === 'string' && s.name.trim().length > 0 && s.name.length <= 40
+  && typeof s.url === 'string' && /^https?:\/\/\S+$/i.test(s.url) && s.url.length <= 500
+  && (s.tags === undefined || (typeof s.tags === 'string' && s.tags.length <= 60)));
+
 /** null, or { name, lat, lon } from the geocoder (see weather.js). */
 const placeOk = (v) => v === null || (isObject(v) && typeof v.name === 'string' && v.name.length <= 80
   && Number.isFinite(v.lat) && Math.abs(v.lat) <= 90 && Number.isFinite(v.lon) && Math.abs(v.lon) <= 180);
@@ -35,6 +41,20 @@ const SCHEMA = {
       blue: null,
     },
     ok: shortcutsOk,
+  },
+  // The radio grid on ◀ from the home screen.
+  radioStations: {
+    def: [
+      { name: '1LIVE', url: 'https://wdr-1live-live.icecastssl.wdr.de/wdr/1live/live/mp3/128/stream.mp3', tags: 'pop, rock' },
+      { name: 'SWR3', url: 'https://liveradio.swr.de/sw282p3/swr3/play.mp3', tags: 'pop, rock' },
+      { name: 'FM4', url: 'https://orf-live.ors-shoutcast.at/fm4-q2a', tags: 'alternative, electronic' },
+      { name: 'Deutschlandfunk', url: 'https://st01.sslstream.dlf.de/dlf/01/128/mp3/stream.mp3', tags: 'news, culture' },
+      { name: 'bigFM', url: 'https://stream.bigfm.de/deutschland/mp3-128/radio-browser', tags: 'charts, hip-hop' },
+      { name: 'Radio BOB!', url: 'https://streams.radiobob.de/bob-national/mp3-192/mediaplayer', tags: 'rock' },
+      { name: 'Klassik Radio', url: 'https://live.streams.klassikradio.de/klassikradio-deutschland/stream/mp3', tags: 'classical' },
+      { name: 'Lofi Radio', url: 'https://0nlineradio.radioho.st/0r-lo-fi', tags: 'lofi, chill' },
+    ],
+    ok: stationsOk,
   },
   // Where the home screen's weather is for; null hides it.
   weatherPlace: { def: null, ok: placeOk },
@@ -95,5 +115,7 @@ export default class Settings extends EventEmitter {
 /** streamlink quality list for a setting: the choice first, then lower fallbacks. */
 export function streamlinkQuality(choice) {
   const i = TWITCH_QUALITIES.indexOf(choice);
-  return [...TWITCH_QUALITIES.slice(i < 0 ? 1 : i), 'best'].join(',');
+  // Twitch names its 30 fps streams "480p30"; a bare "480p" matches none of them.
+  const names = TWITCH_QUALITIES.slice(i < 0 ? 1 : i).flatMap((q) => (/p\d+$/.test(q) ? [q] : [q, `${q}30`]));
+  return [...names, 'best'].join(',');
 }

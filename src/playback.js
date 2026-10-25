@@ -9,8 +9,10 @@ import { edl } from './ytdl.js';
 // mpv opens a file that's repeated in an EDL only once, so this works for
 // URLs too (Reels loop the same way).
 const CLIP_REPEATS = 120;
+// Behind a radio station it has to last longer: 4 hours of 30 s clips, then the last frame stays.
+const RADIO_REPEATS = 480;
 const repeated = (file, n = CLIP_REPEATS) => `edl://${Array(n).fill(`%${Buffer.byteLength(file)}%${file}`).join(';')}`;
-const seamless = (file) => (file.endsWith('.mp4') ? repeated(file) : file);
+const seamless = (file, n) => (file.endsWith('.mp4') ? repeated(file, n) : file);
 
 /**
  * Single owner of what's on screen. Both the cast receiver and the web UI go
@@ -59,7 +61,7 @@ export default class Playback extends EventEmitter {
     this.background = { file: null, loaded: null, id: null, showing: false, failed: null };
     // While the TV is off the backdrop stays loaded but paused, so it's there the moment the TV is back.
     this.standby = false;
-    // Reasons the backdrop holds still: 'standby' (paused), and 'panel' and 'airplay'
+    // Reasons the backdrop holds still: 'standby' (paused), and 'panel', 'airplay' and 'radio' (its grid)
     // (overlay redraws over the moving clip flicker black on a Pi 3).
     this.holds = new Set();
 
@@ -128,7 +130,7 @@ export default class Playback extends EventEmitter {
    * resuming after the overlays changed flashed black, changing the speed doesn't.
    */
   async #holdSpeed() {
-    await this.mpv.set('speed', this.holds.has('panel') || this.holds.has('airplay') ? 0.01 : 1);
+    await this.mpv.set('speed', ['panel', 'airplay', 'radio'].some((r) => this.holds.has(r)) ? 0.01 : 1);
   }
 
   /** Holds the backdrop still while any `reason` holds it. */
@@ -234,6 +236,13 @@ export default class Playback extends EventEmitter {
         await meta;
         await this.mpv.load(local, { title: source.title ?? url });
         this.#mark('loadfile');
+      } else if (kind === 'radio') {
+        // The backdrop plays along as the picture, so the colours keep drifting behind the radio screen.
+        const bg = this.background;
+        const picture = bg.file && bg.file !== bg.failed ? seamless(bg.file, RADIO_REPEATS) : null;
+        await this.mpv.load(url, { title: source.title ?? '', external: picture });
+        this.#mark('loadfile');
+        await this.streamlink.close();
       } else {
         const direct = kind === 'youtube' ? await this.#resolve(url) : null;
         if (this.source !== source) {
@@ -311,7 +320,9 @@ export default class Playback extends EventEmitter {
       // Between asking for a video and its first frame (yt-dlp is slow on a Pi 3).
       loading: !!s && (this.loading || !!p['paused-for-cache']),
       paused: !!s && !this.loading && !!p.pause, // play() holds the old picture still while loading
-      live: s?.kind === 'twitch' || !!s?.live,
+      live: s?.kind === 'twitch' || s?.kind === 'radio' || !!s?.live,
+      // The song a radio station sends along (ICY metadata).
+      song: s?.kind === 'radio' ? p['metadata/by-key/icy-title'] || null : null,
       position: round ? position % round : position,
       duration: round || (s ? p.duration ?? 0 : 0),
       volume: Math.round(p.volume ?? 100),

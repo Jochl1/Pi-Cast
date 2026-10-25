@@ -156,6 +156,19 @@
     <p class="hint" data-i18n="colourKeysHint">A colour key on the TV remote plays its favourite, on any screen.</p>
   </section>
 
+  <section class="group">
+    <h2 class="section-label" data-i18n="radioStations">Radio stations</h2>
+    <div class="list" id="stations"></div>
+    <form class="list" id="radio-search">
+      <label class="row-item" for="radio-query">
+        <span data-i18n="radioSearch">Search for a station</span>
+        <input id="radio-query" class="value-input" type="search" maxlength="80" enterkeyhint="search" autocomplete="off" data-i18n-placeholder="radioSearchPlaceholder">
+      </label>
+    </form>
+    <div class="list" id="radio-results" hidden></div>
+    <p class="hint" data-i18n="radioHint">On the TV: ◀ on the home screen.</p>
+  </section>
+
   <section class="group" id="instagram">
     <h2 class="section-label" data-i18n="instagram">Instagram</h2>
     <form class="list" id="ig-login" autocomplete="on">
