@@ -58,8 +58,8 @@ export default class Playback extends EventEmitter {
     this.background = { file: null, loaded: null, id: null, showing: false, failed: null };
     // While the TV is off the backdrop stays loaded but paused, so it's there the moment the TV is back.
     this.standby = false;
-    // Reasons the backdrop holds still: 'standby' (paused), and 'panel' (overlay redraws
-    // over the moving clip flicker black on a Pi 3).
+    // Reasons the backdrop holds still: 'standby' (paused), and 'panel' and 'airplay'
+    // (overlay redraws over the moving clip flicker black on a Pi 3).
     this.holds = new Set();
 
     mpv.on('ready', () => {
@@ -119,11 +119,11 @@ export default class Playback extends EventEmitter {
   }
 
   /**
-   * For the panel the clip crawls at 1% instead of pausing: resuming after
-   * the overlays changed flashed black, changing the speed doesn't.
+   * For the panel and AirPlay the clip crawls at 1% instead of pausing:
+   * resuming after the overlays changed flashed black, changing the speed doesn't.
    */
   async #holdSpeed() {
-    await this.mpv.set('speed', this.holds.has('panel') ? 0.01 : 1);
+    await this.mpv.set('speed', this.holds.has('panel') || this.holds.has('airplay') ? 0.01 : 1);
   }
 
   /** Holds the backdrop still while any `reason` holds it. */

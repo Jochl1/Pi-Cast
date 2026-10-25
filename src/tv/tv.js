@@ -278,6 +278,8 @@ export default class Tv {
     // overlay would take half of the Pi 3's overlay texture (see screens.js).
     await this.#setBackground(onHome || ['loading', 'reels', 'airplay'].includes(screen) ? t.bg : '#000000');
     this.#updateBackdrop(); // without the card for AirPlay
+    // AirPlay's progress redraws every second, so its backdrop holds still like the panel's.
+    if (screen === 'airplay') this.playback.holdBackground('airplay', true);
 
     const layers = {
       home: null, loading: null, reels: null, popup: null, pause: null, panel: null, toast: null,
@@ -346,13 +348,16 @@ export default class Tv {
     for (const [name, events] of Object.entries(layers)) {
       await this.#send(name, events ? events.join('\n') : null);
     }
-    // The backdrop moves again once the panel is gone: a little later, since
-    // mpv's redraw without it mustn't meet the clip starting to move.
+    // The backdrop moves again once the panel or AirPlay is gone: a little later,
+    // since mpv's redraw without it mustn't meet the clip starting to move.
     clearTimeout(this.unholdTimer);
-    if (!this.panel.open && this.playback.holds.has('panel')) {
-      this.unholdTimer = setTimeout(() => {
-        if (!this.panel.open) this.playback.holdBackground('panel', false);
-      }, UNHOLD_MS);
+    const unhold = () => {
+      if (!this.panel.open) this.playback.holdBackground('panel', false);
+      if (this.screen() !== 'airplay') this.playback.holdBackground('airplay', false);
+    };
+    if ((!this.panel.open && this.playback.holds.has('panel'))
+      || (screen !== 'airplay' && this.playback.holds.has('airplay'))) {
+      this.unholdTimer = setTimeout(unhold, UNHOLD_MS);
     }
     // Reels: the dots sit in the middle, where the next Reel will be.
     const reelLoading = screen === 'reels' && (!this.reels.current || status.loading);
