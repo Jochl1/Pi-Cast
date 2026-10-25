@@ -5,7 +5,6 @@ import { Worker, isMainThread, parentPort, workerData } from 'node:worker_thread
 import zlib from 'node:zlib';
 import { DATA_DIR } from '../config.js';
 import { parseColor } from './ass.js';
-import { CARD } from './screens.js';
 
 /**
  * The home screen's backdrop: a 1920x1080 PNG that mpv shows on its video
@@ -55,14 +54,15 @@ export function shiftHue([r, g, b], deg, { sat = 1, light = 1 } = {}) {
 }
 
 /**
- * Everything the image depends on; also its cache key. `card`: the frosted
- * card behind "Ready to cast" (the AirPlay screen has none).
+ * Everything the image depends on; also its cache key. The glass card is an
+ * overlay now (screens.js), so home and AirPlay share one backdrop; `card:
+ * false` stays in the spec so the rendered clips keep their names.
  */
-export function backgroundSpec(t, { card = true } = {}) {
+export function backgroundSpec(t) {
   const accent = rgb(t.accent);
   // The accent at the top left, a neighbouring hue at the bottom right and a
   // soft third light at the top right, like the draft's glows.
-  const spec = { bg: rgb(t.bg), glows: [], vignette: 0.35, card };
+  const spec = { bg: rgb(t.bg), glows: [], vignette: 0.35, card: false };
   spec.top = shiftHue(rgb(t.bg), 0, { light: 1.5 });
   spec.glows = [
     // `drift`: how far (px) and how much brighter each one moves around its
@@ -87,26 +87,14 @@ export function painter(spec, w = W, h = H) {
   const k = w / W; // spec coordinates are at 1080p
   const n = w * h;
   const { top } = spec;
-  // Per pixel: vignette factor, card (white) alpha.
+  // Per pixel: vignette factor.
   const vig = new Float32Array(n);
-  const card = new Float32Array(n);
-  const box = Object.fromEntries(Object.entries(CARD).map(([key, v]) => [key, v * k]));
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = y * w + x;
       const vx = (x - w / 2) / (w / 2);
       const vy = (y - h / 2) / (h / 2);
       vig[i] = 1 - spec.vignette * smoothstep(0.5, 1.45, Math.sqrt(vx * vx + vy * vy));
-      if (!spec.card) continue;
-      // Frosted card behind "Ready to cast": signed distance to a rounded
-      // rect, antialiased over one pixel, with a brighter top-left edge.
-      const qx = Math.abs(x + 0.5 - (box.x + box.w / 2)) - box.w / 2 + box.r;
-      const qy = Math.abs(y + 0.5 - (box.y + box.h / 2)) - box.h / 2 + box.r;
-      const d = Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - box.r;
-      if (d >= 1.5) continue;
-      const fill = clamp(0.5 - d) * (0.075 - 0.04 * clamp((y - box.y) / box.h));
-      const edge = clamp(1 - Math.abs(d + 1)) * (0.07 + 0.16 * (1 - clamp((x - box.x + y - box.y) / (box.w + box.h))));
-      card[i] = fill + edge;
     }
   }
   // Triangular dither noise of about one level, reused with a per-frame offset.
@@ -162,12 +150,6 @@ export function painter(spec, w = W, h = H) {
         r *= v;
         g *= v;
         b *= v;
-        const ca = card[i];
-        if (ca) {
-          r += (255 - r) * ca;
-          g += (255 - g) * ca;
-          b += (255 - b) * ca;
-        }
         const o = i * 3;
         out[o] = r + noise[ni];
         out[o + 1] = g + noise[(ni + 1) & (NOISE - 1)];
@@ -234,15 +216,15 @@ function paintInWorker(spec) {
 /** Identifies a backdrop by everything it depends on; names its PNG and clip. */
 export const backdropKey = (spec) => crypto.createHash('sha1').update(JSON.stringify(spec)).digest('hex').slice(0, 16);
 
-/** Path of the loop clip for theme `t`, or null if none was rendered for it. `opts` as for backgroundSpec(). */
-export function backgroundClip(t, opts) {
-  const file = path.join(CLIP_DIR, `${backdropKey(backgroundSpec(t, opts))}.mp4`);
+/** Path of the loop clip for theme `t`, or null if none was rendered for it. */
+export function backgroundClip(t) {
+  const file = path.join(CLIP_DIR, `${backdropKey(backgroundSpec(t))}.mp4`);
   return fs.existsSync(file) ? file : null;
 }
 
-/** Path of the background PNG for theme `t`, painted on first use and cached. `opts` as for backgroundSpec(). */
-export async function backgroundPng(t, opts) {
-  const spec = backgroundSpec(t, opts);
+/** Path of the background PNG for theme `t`, painted on first use and cached. */
+export async function backgroundPng(t) {
+  const spec = backgroundSpec(t);
   const key = backdropKey(spec);
   const file = path.join(DIR, `${key}.png`);
   if (fs.existsSync(file)) {

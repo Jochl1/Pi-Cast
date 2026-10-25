@@ -37,7 +37,7 @@ The installer takes 10–20 minutes on a Pi 3. You can run it again at any time,
 
 What it sets up: mpv, ffmpeg, Node.js 22, yt-dlp, streamlink and instagrapi (in `.venv/`), shairport-sync for AirPlay, the fonts, the SponsorBlock script, a `picast` service that starts at boot, a daily yt-dlp/streamlink update (YouTube breaks old versions regularly), Wi-Fi power saving turned off, and the boot splash.
 
-**Optional: the drifting home background.** The Pi paints a still background itself. The animated one is a set of video loops, one per accent color and each with and without the glass card (the AirPlay screen has none), too slow to make on a Pi 3. Render them on a computer with Node.js and ffmpeg (about 20 s and 50 MB each, about 1 GB in all), then copy them over:
+**Optional: the drifting home background.** The Pi paints a still background itself. The animated one is a set of video loops, one per accent color, too slow to make on a Pi 3. Render them on a computer with Node.js and ffmpeg (about 20 s and 50 MB each, about 500 MB in all), then copy them over:
 
 ```sh
 node scripts/render-backdrops.js

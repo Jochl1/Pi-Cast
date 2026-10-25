@@ -122,17 +122,16 @@ export default class Tv {
    * The home screen's backdrop, shown by mpv on its video plane (it would
    * never fit the OSD texture): the drifting loop clip if animation is on and
    * one was rendered for this look, otherwise a still image painted here.
-   * AirPlay's has no glass card.
+   * AirPlay shares it, so switching screens doesn't load another file.
    */
   async #updateBackdrop() {
     const s = this.settings.get();
     const t = screens.look(s);
-    const card = this.screen() !== 'airplay';
-    const key = `${t.accent} ${s.bootAnimation} ${card}`;
+    const key = `${t.accent} ${s.bootAnimation}`;
     if (key === this.backdropKey) return;
     this.backdropKey = key;
     try {
-      const file = (s.bootAnimation && backgroundClip(t, { card })) || await backgroundPng(t, { card });
+      const file = (s.bootAnimation && backgroundClip(t)) || await backgroundPng(t);
       if (this.backdropKey === key) this.playback.setBackground(file);
     } catch (e) {
       this.log.warn('TV background image failed:', e.message);
@@ -277,7 +276,7 @@ export default class Tv {
     // The home screen's backdrop is mpv's own background color: a full-screen
     // overlay would take half of the Pi 3's overlay texture (see screens.js).
     await this.#setBackground(onHome || ['loading', 'reels', 'airplay'].includes(screen) ? t.bg : '#000000');
-    this.#updateBackdrop(); // without the card for AirPlay
+    this.#updateBackdrop();
     // AirPlay's progress redraws every second, so its backdrop holds still like the panel's.
     if (screen === 'airplay') this.playback.holdBackground('airplay', true);
 

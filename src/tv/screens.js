@@ -151,7 +151,7 @@ const weekday = (date, locale) => new Date(`${date}T12:00`).toLocaleDateString(l
 /**
  * Weather at the top right, opposite the clock: icon and temperature, the
  * condition with today's high and low, and the next three days in columns.
- * It ends well above the backdrop's glass card (CARD.y).
+ * It ends well above the glass card (CARD.y).
  * `weather` = { current: { temp, code, day }, days: [{ date, code, max, min }] }
  * with today first.
  */
@@ -225,13 +225,12 @@ function keyHints(t, keys, instagram) {
 export function home(t, {
   now, clock24, net, pairingCode, qr, deviceName, loading, panelOpen, weather: w, keys = [], instagram = false,
 }) {
-  if (panelOpen) return clock(t, now, clock24, 0.35);
+  if (panelOpen) return [glassCard(), ...clock(t, now, clock24, 0.35)];
 
-  const events = [...clock(t, now, clock24), ...bottomBar(t, { pairingCode, qr, net })];
+  const events = [glassCard(), ...clock(t, now, clock24), ...bottomBar(t, { pairingCode, qr, net })];
   if (w) events.push(...weather(t, w));
   if (!loading) events.push(...keyHints(t, keys, instagram));
   if (loading) {
-    // The backdrop image already has the glass card.
     events.push(...loadingText(t, 'loading', loading));
   } else {
     events.push(
@@ -242,8 +241,12 @@ export function home(t, {
   return events;
 }
 
-// The glass card in the middle of the home backdrop (see background.js).
+// The glass card in the middle of the home screen.
 export const CARD = { x: 320, y: 440, w: 1280, h: 222, r: 56 };
+/** The home screen's glass card: a faint white fill and edge over the backdrop. */
+const glassCard = () => rect(CARD.x, CARD.y, CARD.w, CARD.h, {
+  color: '#FFFFFF', opacity: 0.055, radius: CARD.r, border: 2, borderColor: '#FFFFFF', borderOpacity: 0.16,
+});
 const DOTS_Y = CARD.y + CARD.h + 64;
 
 /**
