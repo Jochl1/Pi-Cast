@@ -1,7 +1,4 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import QRCode from 'qrcode';
-import { DATA_DIR } from '../config.js';
 import { ACCENTS, KEY_COLORS } from '../shared/theme.js';
 import { LANGUAGES } from '../shared/i18n.js';
 import { networkStatus } from '../network.js';
@@ -22,8 +19,6 @@ const LAYERS = {
   toast: { id: 6, z: 9 },
 };
 const THUMB_OVERLAY = 0;
-// The backdrop in use, for bin/preload.sh to read into the page cache at boot.
-const BACKDROP_PATH_FILE = path.join(DATA_DIR, 'backdrop-path');
 const POPUP_MS = 5000;
 const FADE_MS = 600;
 const TOAST_MS = 5000;
@@ -140,11 +135,7 @@ export default class Tv {
     this.backdropKey = key;
     try {
       const file = (s.bootAnimation && backgroundClip(t)) || await backgroundPng(t);
-      if (this.backdropKey !== key) return;
-      this.playback.setBackground(file);
-      fs.promises.writeFile(BACKDROP_PATH_FILE, `${file}
-`)
-        .catch((e) => this.log.debug('saving the backdrop path failed:', e.message));
+      if (this.backdropKey === key) this.playback.setBackground(file);
     } catch (e) {
       this.log.warn('TV background image failed:', e.message);
     }

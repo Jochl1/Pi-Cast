@@ -162,8 +162,6 @@ NotifyAccess=all
 TimeoutStartSec=180
 User=$APP_USER
 WorkingDirectory=$REPO
-# Reads the home screen's files into the page cache while Node loads (in the background).
-ExecStartPre=-/bin/sh -c 'sh bin/preload.sh &'
 ExecStart=/usr/bin/node src/index.js
 Restart=always
 RestartSec=3
