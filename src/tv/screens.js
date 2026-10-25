@@ -339,6 +339,33 @@ export function nowPlaying(t, { title, kind, quality, position, duration, live, 
   return events;
 }
 
+/**
+ * Timeline over the running video (▲, or seeking): the pause screen's title,
+ * channel, progress and times in a glass card at the bottom, without the dim.
+ */
+export function timeline(t, { title, channel, kind, position, duration, live }, opacity = 1) {
+  const h = 246;
+  const x = 54;
+  const y = H - 54 - h;
+  const w = W - 2 * x;
+  const left = x + 60;
+  const width = w - 120;
+  const barY = y + 164;
+  const frac = live ? 1 : duration ? Math.min(1, position / duration) : 0;
+  const sub = [channel, source(t, kind)].filter(Boolean).join(' · ');
+  const events = [
+    rect(x, y, w, h, { color: t.glass, opacity, radius: t.radius * 3 }),
+    text(escape(fit(title || t.tr('playing'), 48, width, 0.5)), { x: left, y: y + 44, px: 48, weight: 600, color: ON_VIDEO.text, opacity }),
+    text(escape(fit(sub, 33, width)), { x: left, y: y + 108, px: 33, color: ON_VIDEO.muted, opacity }),
+    rect(left, barY, width, 10, { color: ON_VIDEO.track, radius: 5, opacity }),
+  ];
+  if (frac > 0) events.push(rect(left, barY, Math.max(10, width * frac), 10, { color: t.accent, radius: 5, opacity: live ? opacity * 0.5 : opacity }));
+  const time = (s, tx, an) => text(s, { x: tx, y: barY + 26, an, px: 30, font: 'JetBrains Mono', weight: 500, color: ON_VIDEO.muted, opacity });
+  events.push(live ? time(t.tr('live'), left, 7) : time(fmtTime(position), left, 7));
+  if (!live) events.push(time(fmtTime(duration), left + width, 9));
+  return events;
+}
+
 /** Paused screen: dimmed video, pause ring, title and progress. */
 export function paused(t, { title, channel, kind, position, duration, live }) {
   const left = PAD_X;

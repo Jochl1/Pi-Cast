@@ -243,6 +243,7 @@ export default class Playback extends EventEmitter {
         }
         // Load first, then drop any old Twitch stream, so its EOF lands as a 'stop'.
         if (direct) {
+          source.live = direct.live; // YouTube live streams show "LIVE" instead of times
           // The Referer lets the SponsorBlock script find the video ID.
           const id = youtubeId(url);
           const headers = [
@@ -310,7 +311,7 @@ export default class Playback extends EventEmitter {
       // Between asking for a video and its first frame (yt-dlp is slow on a Pi 3).
       loading: !!s && (this.loading || !!p['paused-for-cache']),
       paused: !!s && !this.loading && !!p.pause, // play() holds the old picture still while loading
-      live: s?.kind === 'twitch',
+      live: s?.kind === 'twitch' || !!s?.live,
       position: round ? position % round : position,
       duration: round || (s ? p.duration ?? 0 : 0),
       volume: Math.round(p.volume ?? 100),

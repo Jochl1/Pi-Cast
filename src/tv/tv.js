@@ -57,6 +57,7 @@ export default class Tv {
     this.history = []; // the last layer changes, newest last
     this.panel ={ open: false, focus: 0, powerConfirm: null }; // powerConfirm: a timer while it waits
     this.card = null; // { until, quality }
+    this.timeline = null; // { until }: the timeline over the running video
     this.sender = null; // { name, until }
     this.message = null; // { text, until }
     this.net = null;
@@ -86,7 +87,7 @@ export default class Tv {
         if (value) setTimeout(() => this.render(), BUFFERING_MS + 50);
       }
       // time-pos only matters for the progress bars.
-      if (name !== 'time-pos' || this.screen() === 'paused' || this.card) this.render();
+      if (name !== 'time-pos' || this.screen() === 'paused' || this.card || this.timeline) this.render();
     });
     playback.on('started', () => this.#onStarted());
     playback.on('change', () => this.render());
@@ -235,6 +236,13 @@ export default class Tv {
     this.settings.update(patch).catch((e) => this.log.warn('TV settings change failed:', e.message));
   }
 
+  /** ▲ or seeking while a video plays: the timeline for a few seconds, in place of the card. */
+  showTimeline() {
+    this.timeline = { until: Date.now() + POPUP_MS };
+    this.card = null;
+    this.render();
+  }
+
   async #onStarted() {
     const { mpv } = this;
     if (this.reels.active) return; // Reels show their own info
@@ -314,6 +322,7 @@ export default class Tv {
     // it's clearly gone (paused, or back home).
     if (this.card && (this.card.until <= now || screen === 'paused' || screen === 'home')) this.card = null;
     if (this.message && this.message.until <= now) this.message = null;
+    if (this.timeline && (this.timeline.until <= now || !status.url)) this.timeline = null;
 
     // The home screen's backdrop is mpv's own background color: a full-screen
     // overlay would take half of the Pi 3's overlay texture (see screens.js).
@@ -358,7 +367,10 @@ export default class Tv {
     }
     if (screen === 'games') layers.home = gameScreens.games(t, this.party.view(), this.gamesQr);
     const popup = [];
-    if (this.card) {
+    // Only over the running video: paused has its own, loading and buffering their card.
+    const timeline = !!this.timeline && screen === 'playing';
+    if (timeline) popup.push(...screens.timeline(t, status, fade(this.timeline.until)));
+    else if (this.card) {
       popup.push(...screens.nowPlaying(t, {
         ...status, quality: this.card.quality, withThumb: !!status.thumbnail,
       }, fade(this.card.until)));
@@ -386,8 +398,8 @@ export default class Tv {
         })),
       });
     }
-    // On game night the board fills the bottom, so toasts go to the top.
-    if (this.message) layers.toast = screens.toast(t, this.message.text, this.message.dot, { top: screen === 'games' });
+    // On game night the board fills the bottom, and the timeline sits there, so toasts go to the top.
+    if (this.message) layers.toast = screens.toast(t, this.message.text, this.message.dot, { top: screen === 'games' || timeline });
 
     for (const [name, events] of Object.entries(layers)) {
       await this.#send(name, events ? events.join('\n') : null);
@@ -414,7 +426,7 @@ export default class Tv {
     await this.#showThumbnail(thumb);
 
     // Wake up again for fades and expiries.
-    const deadlines = [this.card?.until, this.sender?.until, this.message?.until].filter(Boolean);
+    const deadlines = [this.card?.until, this.timeline?.until, this.sender?.until, this.message?.until].filter(Boolean);
     clearTimeout(this.timer);
     if (pulse > 0) {
       this.timer = setTimeout(() => this.render(), 120);

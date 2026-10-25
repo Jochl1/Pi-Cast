@@ -223,6 +223,7 @@ const REMOTE_ACTIONS = {
   backward: () => controls.seekBy(-30),
   forward: () => controls.seekBy(30),
 };
+const SEEK_KEYS = new Set(['left', 'right', 'rewind', 'fastforward', 'backward', 'forward']);
 /** A colour key plays its favourite, on any screen, like "Play a link" in the web app. */
 function playShortcut(color) {
   const tr = translator(settings.get().language);
@@ -259,8 +260,14 @@ function remoteKey(key) {
     party.open();
     return true;
   }
+  // ▲ over a running video: the timeline; seeking shows it too.
+  if (key === 'up' && tv.screen() === 'playing') {
+    tv.showTimeline();
+    return true;
+  }
   if (!playback.source || !REMOTE_ACTIONS[key]) return false;
   Promise.resolve(REMOTE_ACTIONS[key]()).catch((e) => log.debug(`remote key ${key} failed:`, e.message));
+  if (SEEK_KEYS.has(key) && tv.screen() === 'playing') tv.showTimeline();
   return true;
 }
 cec.on('key', remoteKey);

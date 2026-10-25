@@ -97,8 +97,8 @@ TV remote keys:
 | Key | Home screen | Settings panel | During playback | Instagram Reels |
 |---|---|---|---|---|
 | OK | open settings | change value | play / pause | like / unlike |
-| ◀ ▶ | | change value | −10 s / +10 s | −5 s / +5 s |
-| ▲ ▼ | ▲ opens Instagram Reels, ▼ opens game night | move between rows | | previous / next Reel |
+| ◀ ▶ | | change value | −10 s / +10 s (shows the timeline) | −5 s / +5 s |
+| ▲ ▼ | ▲ opens Instagram Reels, ▼ opens game night | move between rows | ▲ shows the timeline for a few seconds | previous / next Reel |
 | Back | | close | stop | back to home (AirPlay: end it) |
 | Play, Pause, Stop, ⏪ ⏩ | | | what they say | what they say |
 | Red, green, yellow, blue | play that key's favourite | play that key's favourite | switch to that key's favourite | switch to that key's favourite |

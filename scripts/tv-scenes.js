@@ -256,6 +256,11 @@ export const scenes = {
     settings: de, reel: true,
     layers: (t) => [screens.reels(t, { reel, paused: true, pulse: 1 }), screens.toast(t, t.tr('reelsLoggedOut'))],
   },
+  timeline: { settings: base, video: true, layers: (t) => [screens.timeline(t, video)] },
+  'timeline-live+toast': {
+    settings: de, video: true,
+    layers: (t) => [screens.timeline(t, { ...video, live: true }), screens.toast(t, toastText, null, { top: true })],
+  },
   'paused+toast': { settings: base, video: true, layers: (t) => [screens.paused(t, video), screens.toast(t, toastText)] },
   'settings+toast': {
     settings: base,
