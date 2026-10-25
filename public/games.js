@@ -12,7 +12,8 @@ function el(tag, props = {}, ...children) {
   const e = document.createElement(tag);
   for (const [k, v] of Object.entries(props)) {
     if (k === 'class') e.className = v;
-    else if (k === 'style') Object.assign(e.style, v);
+    // setProperty, since custom properties (--c) can't be assigned like the others.
+    else if (k === 'style') for (const [p, val] of Object.entries(v)) e.style.setProperty(p.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`), val);
     else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
     else if (v != null && v !== false) e.setAttribute(k, v === true ? '' : v);
   }

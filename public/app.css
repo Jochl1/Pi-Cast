@@ -298,9 +298,11 @@ input[type="range"] { flex-grow: 1; accent-color: var(--accent); height: 28px; }
 .board-tictactoe { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .board-tictactoe .cell {
   aspect-ratio: 1; border: 0; border-radius: 18px; background: var(--surface);
-  display: grid; place-items: center;
+  /* Flex, not grid: the marks' % sizes need the cell's width, which an auto grid track doesn't give. */
+  display: flex; align-items: center; justify-content: center;
 }
 .board-tictactoe .cell:disabled { opacity: 1; cursor: default; }
+.mark-o, .mark-x { display: block; }
 .mark-o { width: 54%; aspect-ratio: 1; border-radius: 50%; border: 11px solid var(--c); }
 .mark-x { width: 56%; aspect-ratio: 1; position: relative; }
 .mark-x::before, .mark-x::after {
