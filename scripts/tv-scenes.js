@@ -91,6 +91,8 @@ const einsView = party((p) => {
   const s = p.game.state;
   s.hands[1] = s.hands[1].slice(0, 1);
   s.called[1] = true;
+  s.hands[0] = [];
+  s.finished = [0];
   s.pile.push({ id: 200, color: 'g', value: '+2' }, { id: 201, color: null, value: '+4' });
   s.color = 'b';
   s.pending = 6;
@@ -98,14 +100,12 @@ const einsView = party((p) => {
   s.last = { seat: 1, type: 'play', card: { id: 201, color: null, value: '+4' }, color: 'b' };
 });
 const einsOverView = party((p) => {
-  p.join(null, { name: 'Johann' });
+  ['Johann', 'Lea', 'Maximilian', 'Sophie'].forEach((name) => p.join(null, { name }));
   p.addBot(null);
   p.select(null, 'eins');
   p.start(null);
   const s = p.game.state;
-  s.hands[0] = [];
-  s.pile.push({ id: 202, color: 'r', value: 'skip' });
-  Object.assign(s, { over: true, winner: 0 });
+  Object.assign(s, { over: true, winner: 2, finished: [2, 0, 4, 1, 3] });
 });
 
 const swatches = Object.entries(ACCENTS).map(([id, a]) => ({ id, hex: a.hex, selected: id === 'violet' }));

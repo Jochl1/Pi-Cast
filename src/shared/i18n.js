@@ -240,6 +240,8 @@ const STRINGS = {
     einsOnPile: '{card} is on the pile',
     einsTurnHint: 'Your turn · {color} or {value}',
     einsCallHint: 'Two cards left: press EINS! before you play',
+    einsPlace: '{n}. place',
+    einsYouFinished: "You're out: {n}. place",
   },
   de: {
     readyToCast: 'Bereit zum Streamen',
@@ -462,6 +464,8 @@ const STRINGS = {
     einsOnPile: '{card} liegt',
     einsTurnHint: 'Du bist dran · {color} oder {value}',
     einsCallHint: 'Noch zwei Karten: vor dem Legen EINS! drücken',
+    einsPlace: 'Platz {n}',
+    einsYouFinished: 'Du bist fertig: Platz {n}',
   },
 };
 

@@ -114,8 +114,12 @@ export function createGames({ api, getTr, reconnect }) {
     const mine = seat >= 0 && g.turn === seat;
     if (!mine) column = null;
 
+    // Eins! plays on for every place.
+    const place = (s.finished?.indexOf(seat) ?? -1) + 1;
     let status;
-    if (s.over) status = s.winner == null ? tr('gamesDraw') : s.winner === seat ? tr('gamesYouWon') : tr('gamesWinner', { name: players[s.winner].name });
+    if (s.over && place > 1) status = tr('einsPlace', { n: place });
+    else if (s.over) status = s.winner == null ? tr('gamesDraw') : s.winner === seat ? tr('gamesYouWon') : tr('gamesWinner', { name: players[s.winner].name });
+    else if (place) status = tr('einsYouFinished', { n: place });
     else if (seat < 0) status = tr('gamesWatching');
     else status = mine ? tr('gamesYourTurn') : tr('gamesTheirTurn', { name: players[g.turn].name });
     const dot = seat >= 0 ? el('span', { class: 'dot', style: { background: players[seat].color } }) : null;

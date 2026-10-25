@@ -355,13 +355,17 @@ function eins(t, view) {
       : { color: '#FFFFFF', opacity: 0.055, radius: 70, border: 2, borderColor: '#FFFFFF', borderOpacity: 0.16 }));
     ev.push(...avatar(t, x + 70, py + 70, 46, p));
     ev.push(text(nameOf(t, p, 34, pw - 150), { x: x + 134, y: py + 50, an: 4, px: 34, weight: 600, color: t.text }));
-    const sub = turn && p.bot && !s.over ? t.tr('gamesThinking') : t.tr(s.counts[i] === 1 ? 'einsOneCard' : 'einsCards', { n: s.counts[i] });
-    ev.push(text(escape(sub), { x: x + 134, y: py + 94, an: 4, px: 26, color: t.muted }));
+    const place = s.finished.indexOf(i) + 1;
+    let sub = t.tr(s.counts[i] === 1 ? 'einsOneCard' : 'einsCards', { n: s.counts[i] });
+    if (place) sub = t.tr('einsPlace', { n: place });
+    else if (turn && p.bot) sub = t.tr('gamesThinking');
+    ev.push(text(escape(sub), { x: x + 134, y: py + 94, an: 4, px: 26, weight: place ? 600 : 400, color: place ? t.accent : t.muted }));
     if (s.counts[i] === 1 && s.called[i]) {
       ev.push(rect(x + pw - 110, py - 22, 120, 48, { color: CARD_COLORS.r, radius: 24 }));
       ev.push(text('EINS!', { x: x + pw - 50, y: py + 2, an: 5, px: 22, weight: 700, spacing: 2, color: '#FFFFFF' }));
     }
   });
+  if (s.over) return [...ev, ...standings(t, players, s.finished)];
   ev.push(text(`{${paint(t.muted)}}${escape(t.tr('einsDirection'))} ${s.dir > 0 ? '→' : '←'}`, { x: W - PAD_X, y: py + 190, an: 9, px: 26, weight: 500 }));
 
   // The table: the draw pile, the pile's top two cards, the colour and an open stack.
@@ -378,10 +382,6 @@ function eins(t, view) {
   ev.push(text(escape(t.tr(`einsColor_${s.color}`).toLocaleUpperCase(t.tr.locale)), { x: dx, y: cy + 184, an: 8, px: 22, weight: 600, spacing: 3, color: t.muted }));
   if (s.pending) ev.push(text(`+${s.pending}`, { x: dx, y: cy + 290, an: 5, px: 72, weight: 700, color: CARD_COLORS.r }));
 
-  if (s.over) {
-    ev.push(...result(t, view, players, cy + ch + 40));
-    return ev;
-  }
   // What just happened, and whose turn it is.
   const l = s.last;
   const who = (seat) => players[seat].name;
@@ -390,6 +390,7 @@ function eins(t, view) {
     line = t.tr('einsPlays', { name: who(l.seat), card: `{${paint(l.card.color ? CARD_COLORS[l.card.color] : t.text)}}${escape(cardName(t.tr, l.card))}{${paint(t.muted)}}` });
     if (l.card.color == null) line += ` → {${paint(CARD_COLORS[l.color])}}${escape(t.tr(`einsColor_${l.color}`))}{${paint(t.muted)}}`;
     if (l.penalty) line += ` · ${escape(t.tr('einsForgot'))}`;
+    if (l.place) line += ` · {${paint(t.accent)}}${escape(t.tr('einsPlace', { n: l.place }))}{${paint(t.muted)}}`;
   } else if (l?.type === 'draw') {
     line = escape(t.tr(l.n === 1 ? 'einsDrawsOne' : 'einsDraws', { name: who(l.seat), n: l.n }));
   }
@@ -397,6 +398,24 @@ function eins(t, view) {
   ev.push(text([line, turnText].filter(Boolean).join(` {${paint(t.muted)}}· `), { x: W / 2, y: cy + ch + 90, an: 5, px: 34, color: t.muted }));
   ev.push(hints(t, [[t.tr('keyBack'), t.tr('gamesEnd')]]));
   return ev;
+}
+
+/** The end of an Eins! round: every place, first to last. */
+function standings(t, players, finished) {
+  const rowH = 84;
+  const y0 = 560 - (finished.length * rowH) / 2;
+  const x = W / 2 - 230;
+  const ev = [];
+  finished.forEach((seat, i) => {
+    const y = y0 + i * rowH + rowH / 2;
+    const p = players[seat];
+    ev.push(
+      text(`${i + 1}.`, { x: x + 40, y, an: 6, px: i ? 40 : 52, weight: 700, color: i ? t.muted : t.accent }),
+      ...avatar(t, x + 100, y, 30, p),
+      text(nameOf(t, p, i ? 40 : 48, 380), { x: x + 150, y, an: 4, px: i ? 40 : 48, weight: 600, color: i ? t.text : t.accent }),
+    );
+  });
+  return [...ev, hints(t, [['OK', t.tr('gamesAgain')], [t.tr('keyBack'), t.tr('gamesToLobby')]])];
 }
 
 const BOARDS = { connect4, tictactoe, eins };

@@ -35,8 +35,15 @@ function playable(s, card) {
   return isWild(card) || card.color === s.color || card.value === top(s).value;
 }
 
-/** The seat `steps` places on in the current direction. */
-const next = (s, from, steps = 1) => (((from + steps * s.dir) % s.hands.length) + s.hands.length) % s.hands.length;
+/** The seat `steps` players on in the current direction, passing over those who have finished. */
+function next(s, from, steps = 1) {
+  const n = s.hands.length;
+  let seat = from;
+  for (let k = 0; k < steps; k++) {
+    do seat = (seat + s.dir + n) % n; while (s.finished.includes(seat));
+  }
+  return seat;
+}
 
 /** Draws `n` cards for `seat`; when the deck runs out, the pile (but its top card) is shuffled in. */
 function draw(s, seat, n) {
@@ -50,7 +57,7 @@ function draw(s, seat, n) {
 }
 
 const clone = (s) => ({
-  ...s, hands: s.hands.map((h) => [...h]), deck: [...s.deck], pile: [...s.pile], called: [...s.called],
+  ...s, hands: s.hands.map((h) => [...h]), deck: [...s.deck], pile: [...s.pile], called: [...s.called], finished: [...s.finished],
 });
 
 /**
@@ -58,7 +65,9 @@ const clone = (s) => ({
  * combination, and whoever can't add one draws the whole stack and is done;
  * +4 can always be played; drawing (one card) ends the turn; with two players
  * a reverse works as a skip. Press "Eins!" before playing your second-to-last
- * card, or draw 2 as a penalty.
+ * card, or draw 2 as a penalty. Whoever runs out of cards takes the next
+ * place, and the round goes on until one player is left (last place).
+ * `winner` is first place, `finished` the seats in finishing order.
  *
  * Actions: { type: 'play', card: id, color?: 'r'|'y'|'g'|'b' (wilds), eins?: true },
  * { type: 'draw' }.
@@ -71,7 +80,7 @@ export default {
   create(seats, round) {
     const s = {
       deck: deck(), hands: Array.from({ length: seats }, () => []), pile: [], color: null, dir: 1,
-      turn: round % seats, pending: 0, called: Array(seats).fill(false), last: null, over: false, winner: null,
+      turn: round % seats, pending: 0, called: Array(seats).fill(false), finished: [], last: null, over: false, winner: null,
     };
     for (let i = 0; i < HAND; i++) for (let p = 0; p < seats; p++) draw(s, p, 1);
     // The first card is a number, so the round starts without an effect.
@@ -104,13 +113,20 @@ export default {
     s.pile.push(card);
     s.color = isWild(card) ? action.color : card.color;
     s.last = { seat, type: 'play', card, color: s.color };
+    // Out of cards: the next place. The card still counts (a +2 still stacks for the next player).
     if (!hand.length) {
-      s.over = true;
-      s.winner = seat;
-      return s;
-    }
-    // Down to one card without calling it: two cards as a penalty.
-    if (hand.length === 1 && !action.eins) {
+      s.finished.push(seat);
+      s.last.place = s.finished.length;
+      s.winner = s.finished[0];
+      s.called[seat] = false;
+      const left = s.hands.map((_, i) => i).filter((i) => !s.finished.includes(i));
+      if (left.length === 1) {
+        s.finished.push(left[0]);
+        s.over = true;
+        return s;
+      }
+    } else if (hand.length === 1 && !action.eins) {
+      // Down to one card without calling it: two cards as a penalty.
       draw(s, seat, 2);
       s.last.penalty = true;
     }
@@ -119,7 +135,8 @@ export default {
     if (card.value === 'skip') steps = 2;
     else if (card.value === 'rev') {
       s.dir = -s.dir;
-      if (s.hands.length === 2) steps = 2; // two players: the same player goes again
+      // Two players left: the same player goes again (not if that was their last card).
+      if (hand.length && s.hands.length - s.finished.length === 2) steps = 2;
     } else if (card.value === '+2' || card.value === '+4') {
       s.pending += Number(card.value.slice(1));
     }
@@ -131,7 +148,7 @@ export default {
   public(s) {
     return {
       counts: s.hands.map((h) => h.length), pile: s.pile.slice(-2), deck: s.deck.length, color: s.color, dir: s.dir,
-      pending: s.pending, called: s.called, last: s.last, turn: s.turn, over: s.over, winner: s.winner,
+      pending: s.pending, called: s.called, finished: s.finished, last: s.last, turn: s.turn, over: s.over, winner: s.winner,
     };
   },
 
