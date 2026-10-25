@@ -9,6 +9,7 @@ const PIPE = '/tmp/shairport-sync-metadata';
 const COVER_DIR = path.join(DATA_DIR, 'airplay');
 const RATE = 44100; // AirPlay's RTP clock
 const RETRY_MS = 3000;
+const RTSP_PORT = 5000; // shairport-sync's default for classic AirPlay
 
 /**
  * AirPlay audio through shairport-sync, which plays on its own; this reads
@@ -36,6 +37,20 @@ export default class AirPlay extends EventEmitter {
   start() {
     if (process.platform === 'win32') return;
     this.#open();
+    this.#findSession();
+  }
+
+  /**
+   * A session that was already on when Pi-Cast (re)started: its 'abeg' is
+   * long gone, but the sender's connection to shairport-sync's port is still
+   * there. The title and cover come with the next track.
+   */
+  #findSession() {
+    execFile('ss', ['-tnH', 'state', 'established', `( sport = :${RTSP_PORT} )`], (e, out) => {
+      if (e || !out.trim() || this.state.active) return;
+      this.log.info('AirPlay session already on');
+      this.#set({ active: true, playing: true });
+    });
   }
 
   /**
@@ -114,13 +129,16 @@ export default class AirPlay extends EventEmitter {
       case 'mden': {
         const { title = null, artist = null, album = null } = this.pending;
         if (title !== this.state.title || artist !== this.state.artist) this.log.info(`AirPlay: ${artist} – ${title}`);
-        this.#set({ title, artist, album });
+        // Only sent during a session, so it also catches one that began before Pi-Cast started.
+        this.#set({ active: true, title, artist, album });
         break;
       }
       case 'prgr': {
         const [start, current, end] = text().split('/').map(Number);
         if ([start, current, end].every(Number.isFinite)) {
-          this.#set({ position: Math.max(0, (current - start) / RATE), duration: Math.max(0, (end - start) / RATE), at: Date.now() });
+          this.#set({
+            active: true, position: Math.max(0, (current - start) / RATE), duration: Math.max(0, (end - start) / RATE), at: Date.now(),
+          });
         }
         break;
       }
