@@ -35,11 +35,13 @@ export default function createWebServer({
   app.get('/api/settings', (req, res) => res.json(settings.get()));
   app.put('/api/settings', action((body) => settings.update(body)));
 
-  // Used by the web app and the iOS "Send to Pi-Cast" Shortcut.
-  app.post('/api/play', action(async ({ url, text }) => {
+  // Used by the web app, the iOS "Send to Pi-Cast" Shortcut and Lumen's cast button. `start` (seconds) is where
+  // Lumen was in the video; live streams ignore it.
+  app.post('/api/play', action(async ({ url, text, start }) => {
     const target = extractUrl(url ?? text);
     if (!target) throw badRequest('No link found');
-    await playback.play(target, { owner: 'web' });
+    if (start !== undefined && !(Number.isFinite(start) && start >= 0)) throw badRequest('start must be seconds (0 or more)');
+    await playback.play(target, { owner: 'web', start: start ?? 0 });
   }));
 
   // GET variant, for Shortcuts that open a URL instead of posting JSON.

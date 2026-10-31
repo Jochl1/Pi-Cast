@@ -229,6 +229,7 @@ streamlink with `--player-external-http` on `127.0.0.1`; Pi-Cast waits for its U
 - Plain HTML/CSS/JS in `public/`, mobile-first, with iOS standalone meta tags, safe-area insets, a manifest and generated icons.
 - Live state comes over SSE (`/api/events`), with no polling.
 - iOS web apps can't be share targets, which is why the Shortcut exists. It POSTs `{url}` to `/api/play`.
+- Lumen (the owner's iPhone app) casts with `POST /api/play {url, start}`: `start` is the position in seconds the phone was at (0 or more; live streams ignore it). It then drives playback with `/api/toggle`, `/api/seek`, `/api/stop` and reads `/api/status`.
 
 ### Sounds
 
