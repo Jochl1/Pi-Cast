@@ -1,5 +1,10 @@
 import { spawn } from 'node:child_process';
 
+/** A Twitch VOD link (twitch.tv/videos/<id>), the only kind streamlink can start partway. */
+export function isVod(url) {
+  return /^https?:\/\/(?:www\.|m\.)?twitch\.tv\/(?:[\w-]+\/)?v(?:ideos?)?\/\d+/i.test(url ?? '');
+}
+
 /**
  * Wraps streamlink, used for Twitch. streamlink filters Twitch's ad segments
  * out of the stream (always on since streamlink 6) and serves the result over
@@ -12,8 +17,12 @@ export default class Streamlink {
     this.proc = null;
   }
 
-  /** Starts streamlink for `url` and resolves with the local URL mpv should open. */
-  async open(url, quality) {
+  /**
+   * Starts streamlink for `url` and resolves with the local URL mpv should open.
+   * `start` (seconds) starts a VOD (twitch.tv/videos/…) there; live streams and
+   * clips ignore it.
+   */
+  async open(url, quality, { start = 0 } = {}) {
     await this.close();
     const { streamlinkPath } = this.config;
     // No --player-external-http-port: a random free port avoids clashing with
@@ -22,6 +31,7 @@ export default class Streamlink {
       '--player-external-http',
       '--player-external-http-interface', '127.0.0.1',
       '--stream-segment-threads', '2',
+      ...(start > 0 && isVod(url) ? ['--hls-start-offset', String(Math.floor(start))] : []),
       url,
       quality,
     ];

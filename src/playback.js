@@ -231,7 +231,7 @@ export default class Playback extends EventEmitter {
       if (kind === 'twitch') {
         // Opening a new stream kills the old streamlink first; the resulting
         // EOF of the old item is ignored because we're switching.
-        const local = await this.streamlink.open(url, this.getTwitchQuality());
+        const local = await this.streamlink.open(url, this.getTwitchQuality(), { start });
         this.#mark('streamlink');
         await meta;
         await this.mpv.load(local, { title: source.title ?? url });
