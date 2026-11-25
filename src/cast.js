@@ -1,6 +1,15 @@
 import { EventEmitter } from 'node:events';
 import YouTubeCastReceiver, { RESET_PLAYER_ON_DISCONNECT_POLICIES } from 'yt-cast-receiver';
+import Innertube from 'youtubei.js'; // yt-cast-receiver's own copy (only user)
 import CastPlayer from './castPlayer.js';
+
+// yt-cast-receiver creates a fresh Innertube session whenever a phone connects
+// after a disconnect, and by default that downloads and parses YouTube's ~4 MB
+// player script, which takes ~25 s on the Pi and delays every cast. The
+// receiver only uses Innertube for /next and /player requests (titles, autoplay,
+// watch history), never for deciphering streams (yt-dlp does that), so skip it.
+const createInnertube = Innertube.create.bind(Innertube);
+Innertube.create = (config = {}) => createInnertube({ retrieve_player: false, ...config });
 
 /**
  * Owns the YouTube cast receiver. The device name is fixed when the receiver
