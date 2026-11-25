@@ -102,6 +102,16 @@ export default class Playback extends EventEmitter {
         return;
       }
       if (this.switching || (reason !== 'eof' && reason !== 'error')) return;
+      // YouTube's video servers sometimes refuse the first request for a
+      // freshly resolved stream; the same URLs open fine a moment later.
+      const last = this.lastPlay;
+      if (reason === 'error' && this.loading && last && !last.retried
+          && this.source?.kind === 'youtube' && !this.timing?.['file-loaded']) {
+        this.log.warn('couldn\'t open the YouTube stream, retrying once');
+        this.play(last.url, { ...last.args, info: this.source, retried: true })
+          .catch((e) => this.log.warn('retry failed:', e.message));
+        return;
+      }
       this.#setLoading(false);
       const { owner } = this;
       this.#clear();
@@ -200,9 +210,10 @@ export default class Playback extends EventEmitter {
    * without a black flash between rounds.
    */
   async play(url, {
-    owner, start = 0, info = null, loop = false,
+    owner, start = 0, info = null, loop = false, retried = false,
   }) {
     const kind = info?.kind ?? classify(url);
+    this.lastPlay = { url, args: { owner, start, loop }, retried };
     const previous = this.owner;
     this.switching = true;
     this.timing = { request: Date.now() };
