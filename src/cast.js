@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import YouTubeCastReceiver from 'yt-cast-receiver';
+import YouTubeCastReceiver, { RESET_PLAYER_ON_DISCONNECT_POLICIES } from 'yt-cast-receiver';
 import CastPlayer from './castPlayer.js';
 
 /**
@@ -26,6 +26,10 @@ export default class Cast extends EventEmitter {
       dataStore: this.dataStore,
       logLevel: this.logLevel,
     });
+    // A phone that locks or backgrounds the YouTube app (e.g. after pausing)
+    // drops off "implicitly"; keep the video then, like a real TV does, and
+    // only stop when the phone disconnects on purpose.
+    receiver.setResetPlayerOnDisconnectPolicy(RESET_PLAYER_ON_DISCONNECT_POLICIES.ALL_EXPLICITLY_DISCONNECTED);
     receiver.on('senderConnect', (s) => {
       this.log.info(`cast: ${s.name} connected`);
       this.emit('senderConnect', s.name);
